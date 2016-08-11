@@ -2854,6 +2854,7 @@ sp_decl_idents:
 sp_opt_default:
           /* Empty */ { $$ = NULL; }
         | DEFAULT expr { $$ = $2; }
+        | SET_VAR expr { $$ = $2; }
         ;
 
 /*
