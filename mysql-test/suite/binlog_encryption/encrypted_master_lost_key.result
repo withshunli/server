@@ -1,0 +1,111 @@
+#################
+# Initialization
+#################
+include/rpl_init.inc [topology=1->2]
+connection server_2;
+include/stop_slave.inc
+#####################################################
+# Pre-test 1: Initial key value
+#####################################################
+connection server_1;
+CREATE TABLE table1_to_encrypt (
+pk INT AUTO_INCREMENT PRIMARY KEY,
+ts TIMESTAMP NULL,
+b BLOB
+) ENGINE=MyISAM;
+INSERT INTO table1_to_encrypt VALUES (NULL,NOW(),'data_to_encrypt');
+INSERT INTO table1_to_encrypt SELECT NULL,NOW(),b FROM table1_to_encrypt;
+SET binlog_format=ROW;
+INSERT INTO table1_to_encrypt SELECT NULL,NOW(),b FROM table1_to_encrypt;
+INSERT INTO table1_to_encrypt SELECT NULL,NOW(),b FROM table1_to_encrypt;
+#
+# The next step will cause a perl error if the search does not
+# meet the expectations. 
+#   Pattern to look for: table1_to_encrypt
+#   Files to search:     master-bin.0*
+#   Expected result:     0 
+# (0 means the pattern should not be found, 1 means it should be found)
+#
+Did not find any occurrences of 'table1_to_encrypt' in master-bin.0*
+#######################################################
+# Pre-test 2: restart master with a different key value
+#######################################################
+connection default;
+connection server_1;
+CREATE TABLE table2_to_encrypt (
+pk INT AUTO_INCREMENT PRIMARY KEY,
+ts TIMESTAMP NULL,
+b BLOB
+) ENGINE=MyISAM;
+INSERT INTO table2_to_encrypt VALUES (NULL,NOW(),'data_to_encrypt');
+INSERT INTO table2_to_encrypt SELECT NULL,NOW(),b FROM table2_to_encrypt;
+SET binlog_format=ROW;
+INSERT INTO table2_to_encrypt SELECT NULL,NOW(),b FROM table2_to_encrypt;
+INSERT INTO table2_to_encrypt SELECT NULL,NOW(),b FROM table2_to_encrypt;
+#
+# The next step will cause a perl error if the search does not
+# meet the expectations. 
+#   Pattern to look for: table2_to_encrypt
+#   Files to search:     master-bin.0*
+#   Expected result:     0 
+# (0 means the pattern should not be found, 1 means it should be found)
+#
+Did not find any occurrences of 'table2_to_encrypt' in master-bin.0*
+#####################################################
+# Pre-test 3: restart master again with the right key
+#####################################################
+connection default;
+connection server_1;
+CREATE TABLE table3_to_encrypt (
+pk INT AUTO_INCREMENT PRIMARY KEY,
+ts TIMESTAMP NULL,
+b BLOB
+) ENGINE=MyISAM;
+INSERT INTO table3_to_encrypt VALUES (NULL,NOW(),'data_to_encrypt');
+INSERT INTO table3_to_encrypt SELECT NULL,NOW(),b FROM table3_to_encrypt;
+INSERT INTO table3_to_encrypt SELECT NULL,NOW(),b FROM table3_to_encrypt;
+FLUSH BINARY LOGS;
+INSERT INTO table3_to_encrypt SELECT NULL,NOW(),b FROM table3_to_encrypt;
+# WARNING: Part of the test was disabled due to MDEV-11323
+#####################################################
+# Test 2: check that replication works if it starts
+#         from a good binary log
+#####################################################
+connection server_2;
+include/stop_slave.inc
+Warnings:
+Note	1255	Slave already has been stopped
+RESET SLAVE ALL;
+DROP DATABASE test;
+CREATE DATABASE test;
+USE test;
+CHANGE MASTER TO MASTER_HOST='127.0.0.1', MASTER_PORT=<MASTER_PORT>, MASTER_USER='root', MASTER_LOG_FILE='master-bin.000003';
+include/start_slave.inc
+SHOW TABLES;
+Tables_in_test
+table3_to_encrypt
+#####################################################
+# Test 3: check that replication works if we purge
+#         master logs up to the good one
+#####################################################
+connection server_2;
+connection server_1;
+PURGE BINARY LOGS TO 'master-bin.000003';
+connection server_2;
+include/stop_slave.inc
+RESET SLAVE ALL;
+DROP DATABASE test;
+CREATE DATABASE test;
+USE test;
+CHANGE MASTER TO MASTER_HOST='127.0.0.1', MASTER_PORT=<MASTER_PORT>, MASTER_USER='root';
+include/start_slave.inc
+SHOW TABLES;
+Tables_in_test
+table3_to_encrypt
+##########
+# Cleanup
+##########
+connection server_1;
+DROP TABLE table1_to_encrypt, table2_to_encrypt, table3_to_encrypt;
+connection server_2;
+include/rpl_end.inc
