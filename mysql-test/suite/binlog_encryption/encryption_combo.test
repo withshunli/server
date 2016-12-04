@@ -50,10 +50,11 @@ INSERT INTO table1_no_encryption SELECT NULL,NOW(),b FROM table1_no_encryption;
 
 # Make sure that binary logs are not encrypted
 
---let search_files=master-bin.0*
---let search_pattern= table1_no_encryption
---let search_result= 1
---source grep_binlog.inc
+--let $master_datadir= `SELECT @@datadir`
+
+--let SEARCH_FILE= $master_datadir/master-bin.0*
+--let SEARCH_PATTERN= table1_no_encryption
+--source include/search_pattern_in_file.inc
 
 --echo #####################################################
 --echo # Part 2: restart master, now with binlog encryption
@@ -78,10 +79,9 @@ INSERT INTO table2_to_encrypt SELECT NULL,NOW(),b FROM table2_to_encrypt;
 
 # Make sure that binary logs are encrypted
 
---let search_files=master-bin.0*
---let search_pattern= table2_to_encrypt
---let search_result= 0
---source grep_binlog.inc
+--let SEARCH_FILE= $master_datadir/master-bin.0*
+--let SEARCH_PATTERN= table2_to_encrypt
+--source include/search_pattern_in_file.inc
 
 --echo #####################################################
 --echo # Part 3: restart master again without encryption

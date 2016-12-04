@@ -4,14 +4,10 @@ create table t1(a int);
 select * into outfile 'MYSQLD_DATADIR/rpl_loaddatalocal.select_outfile' from t1;
 truncate table t1;
 load data local infile 'MYSQLD_DATADIR/rpl_loaddatalocal.select_outfile' into table t1;
-connection slave;
 select a,count(*) from t1 group by a;
 a	count(*)
 1	10000
-connection master;
 drop table t1;
-connection slave;
-connection master;
 create table t1(a int);
 insert into t1 values (1), (2), (2), (3);
 select * into outfile 'MYSQLD_DATADIR/rpl_loaddatalocal.select_outfile' from t1;
@@ -25,17 +21,14 @@ a
 1
 2
 3
-connection slave;
 SELECT * FROM t1 ORDER BY a;
 a
 1
 2
 3
-connection master;
 drop table t1;
-connection slave;
 ==== Bug22504 Initialize ====
-connection master;
+[on master]
 SET sql_mode='ignore_space';
 CREATE TABLE t1(a int);
 insert into t1 values (1), (2), (3), (4);
@@ -48,7 +41,7 @@ a
 2
 3
 4
-connection slave;
+[on slave]
 SELECT * FROM t1 ORDER BY a;
 a
 1
@@ -56,14 +49,14 @@ a
 3
 4
 ==== Clean up ====
-connection master;
+[on master]
 DROP TABLE t1;
-connection slave;
+[on slave]
 
 Bug #43746:
 "return wrong query string when parse 'load data infile' sql statement"
 
-connection master;
+[master]
 SELECT @@SESSION.sql_mode INTO @old_mode;
 SET sql_mode='ignore_space';
 CREATE TABLE t1(a int);
@@ -82,32 +75,31 @@ LOAD DATA/*!10000 LOCAL */INFILE 'MYSQLD_DATADIR/bug43746.sql' INTO/* empty */TA
 LOAD/*!999999 special comments that do not expand */DATA/*!999999 code from the future */LOCAL INFILE 'MYSQLD_DATADIR/bug43746.sql'/*!999999 have flux capacitor */INTO/*!999999 will travel */TABLE t1;
 SET sql_mode='PIPES_AS_CONCAT,ANSI_QUOTES,NO_KEY_OPTIONS,NO_TABLE_OPTIONS,NO_FIELD_OPTIONS,STRICT_TRANS_TABLES,STRICT_ALL_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,TRADITIONAL,NO_AUTO_CREATE_USER';
 LOAD DATA LOCAL INFILE 'MYSQLD_DATADIR/bug43746.sql' INTO TABLE t1;
-connection slave;
+[slave]
 
 Bug #59267:
 "LOAD DATA LOCAL INFILE not executed on slave with SBR"
 
-connection master;
+[master]
 SELECT * INTO OUTFILE 'MYSQLD_DATADIR/bug59267.sql' FROM t1;
 TRUNCATE TABLE t1;
 LOAD DATA LOCAL INFILE 'MYSQLD_DATADIR/bug59267.sql' INTO TABLE t1;
 SELECT 'Master', COUNT(*) FROM t1;
 Master	COUNT(*)
 Master	44
-connection slave;
+[slave]
 SELECT 'Slave', COUNT(*) FROM t1;
 Slave	COUNT(*)
 Slave	44
-connection master;
+[master]
 DROP TABLE t1;
 SET SESSION sql_mode=@old_mode;
-connection slave;
-connection master;
+[slave]
 
 Bug #60580/#11902767:
 "statement improperly replicated crashes slave sql thread"
 
-connection master;
+[master]
 CREATE TABLE t1(f1 INT, f2 INT);
 CREATE TABLE t2(f1 INT, f2 TIMESTAMP);
 INSERT INTO t2 VALUES(1, '2011-03-22 21:01:28');
@@ -121,14 +113,13 @@ LOAD DATA LOCAL INFILE 'MYSQLD_DATADIR/bug60580.csv' INTO TABLE t1 (@f1) SET f2 
 SELECT * FROM t1;
 f1	f2
 NULL	NULL
-connection slave;
+[slave]
 SELECT * FROM t1;
 f1	f2
 NULL	NULL
-connection master;
+[master]
 DROP VIEW v1;
 DROP TABLE t1, t2, t3;
-connection slave;
-connection master;
+[slave]
 include/rpl_end.inc
 # End of 5.1 tests

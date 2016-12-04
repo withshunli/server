@@ -104,20 +104,19 @@ SET binlog_row_image= MINIMAL;
 --echo # Final checks for the master
 --echo #############################
 
---let search_files=master-bin.0*
---let search_pattern= _to_encrypt
---let search_result= 0
---source grep_binlog.inc
+--let $master_datadir= `SELECT @@datadir`
 
---let search_files=master-bin.0*
---let search_pattern= COMMIT
---let search_result= 0
---source grep_binlog.inc
+--let SEARCH_FILE= $master_datadir/master-bin.0*
+--let SEARCH_PATTERN= _to_encrypt
+--source include/search_pattern_in_file.inc
 
---let search_files=master-bin.0*
---let search_pattern= TIMESTAMP
---let search_result= 0
---source grep_binlog.inc
+--let SEARCH_FILE= $master_datadir/master-bin.0*
+--let SEARCH_PATTERN= COMMIT
+--source include/search_pattern_in_file.inc
+
+--let SEARCH_FILE= $master_datadir/master-bin.0*
+--let SEARCH_PATTERN= TIMESTAMP
+--source include/search_pattern_in_file.inc
 
 --disable_connect_log
 --source include/save_master_pos.inc
@@ -131,25 +130,24 @@ SET binlog_row_image= MINIMAL;
 
 --connection server_2
 
+--let $slave_datadir= `SELECT @@datadir`
+
 --disable_connect_log
 --source include/sync_io_with_master.inc
 
 # Check that relay logs are unencrypted
 
---let search_files=slave-relay-bin.0*
---let search_pattern= _to_encrypt
---let search_result= 1
---source grep_binlog.inc
+--let SEARCH_FILE= $slave_datadir/slave-relay-bin.0*
+--let SEARCH_PATTERN= _to_encrypt
+--source include/search_pattern_in_file.inc
 
---let search_files=slave-relay-bin.0*
---let search_pattern= COMMIT
---let search_result= 1
---source grep_binlog.inc
+--let SEARCH_FILE= $slave_datadir/slave-relay-bin.0*
+--let SEARCH_PATTERN= COMMIT
+--source include/search_pattern_in_file.inc
 
---let search_files=slave-relay-bin.0*
---let search_pattern= TIMESTAMP
---let search_result= 1
---source grep_binlog.inc
+--let SEARCH_FILE= $slave_datadir/slave-relay-bin.0*
+--let SEARCH_PATTERN= TIMESTAMP
+--source include/search_pattern_in_file.inc
 
 
 # Re-enable SQL thread, let it catch up with IO thread
@@ -159,20 +157,17 @@ SET binlog_row_image= MINIMAL;
 --source include/sync_slave_sql_with_io.inc
 --enable_connect_log
 
---let search_files=slave-bin.0*
---let search_pattern= _to_encrypt
---let search_result= 1
---source grep_binlog.inc
+--let SEARCH_FILE= $slave_datadir/slave-bin.0*
+--let SEARCH_PATTERN= _to_encrypt
+--source include/search_pattern_in_file.inc
 
---let search_files=slave-bin.0*
---let search_pattern= COMMIT
---let search_result= 1
---source grep_binlog.inc
+--let SEARCH_FILE= $slave_datadir/slave-bin.0*
+--let SEARCH_PATTERN= COMMIT
+--source include/search_pattern_in_file.inc
 
---let search_files=slave-bin.0*
---let search_pattern= TIMESTAMP
---let search_result= 1
---source grep_binlog.inc
+--let SEARCH_FILE= $slave_datadir/slave-bin.0*
+--let SEARCH_PATTERN= TIMESTAMP
+--source include/search_pattern_in_file.inc
 
 --echo ##########
 --echo # Cleanup

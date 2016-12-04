@@ -1,9 +1,4 @@
 #
-# TODO: finalize the test when MDEV-11323 is fixed or clarified;
-#       and write here what it actually checks.
-#       The part where slave synchronizes with master will need
-#       to be changed, but how it is changed depends on MDEV-11323.
-#
 # The test checks effects and workarounds for the situation when
 # the key used to encrypt previous binary logs on master has been lost,
 # and master runs with a different one.
@@ -13,10 +8,11 @@
 # on the master, then restarts the server with encrypted binlog, 
 # but with a different value for key 1. 
 # 
-# Then it resumes replication and checks what happens when the server
-# tries to feed the binary logs to the slave (it should not work).
+# Then it resumes replication and checks what happens when the master
+# feed the encrypted logs to the slave (slave SQL thread should
+# produce and error).
 #
-# Then it resets the slave, configures it to start from a "good"
+# Then the test resets the slave, configures it to start from a "good"
 # master binlog log, for which the master has a key, starts replication
 # and checks that it works.
 #
@@ -62,10 +58,9 @@ INSERT INTO table1_to_encrypt SELECT NULL,NOW(),b FROM table1_to_encrypt;
 
 # Make sure that binary logs are encrypted
 
---let search_files=master-bin.0*
---let search_pattern= table1_to_encrypt
---let search_result= 0
---source grep_binlog.inc
+--let SEARCH_FILE= master-bin.0*
+--let SEARCH_PATTERN= table1_to_encrypt
+--source include/search_pattern_in_file.inc
 
 --echo #######################################################
 --echo # Pre-test 2: restart master with a different key value
@@ -75,7 +70,7 @@ INSERT INTO table1_to_encrypt SELECT NULL,NOW(),b FROM table1_to_encrypt;
 1;00000AAAAAAAAAAAAAAAAAAAAAA00000
 EOF
 
---let $rpl_server_parameters= --loose-file-key-management-filename=$MYSQL_TMP_DIR/master_lose_key.key
+--let $rpl_server_parameters= --file-key-management-filename=$MYSQL_TMP_DIR/master_lose_key.key
 
 --let $rpl_server_number= 1
 --source restart_server.inc
@@ -94,10 +89,9 @@ INSERT INTO table2_to_encrypt SELECT NULL,NOW(),b FROM table2_to_encrypt;
 
 # Make sure that binary logs are encrypted
 
---let search_files=master-bin.0*
---let search_pattern= table2_to_encrypt
---let search_result= 0
---source grep_binlog.inc
+--let SEARCH_FILE= master-bin.0*
+--let SEARCH_PATTERN= table2_to_encrypt
+--source include/search_pattern_in_file.inc
 
 --echo #####################################################
 --echo # Pre-test 3: restart master again with the right key
@@ -123,25 +117,30 @@ INSERT INTO table3_to_encrypt SELECT NULL,NOW(),b FROM table3_to_encrypt;
 
 --save_master_pos
 
-# TODO: Fix and re-enable after MDEV-11323 is closed
---disable_parsing
-
 --echo #####################################################
---echo # Test 1: check how replication goes when it reaches
---echo #         the log with a wrong key
+--echo # Test 1: Check that if master has an encrypted
+--echo #         binary log which it cannot decrypt, it 
+--echo #         still feeds events to the slave, and SQL 
+--echo #         thread produces an expected error upon 
+--echo #         receiving these unreadable events .
+--echo #         This behavior is confirmed in MDEV-11323
 --echo #####################################################
 --connection server_2
 
 --disable_connect_log
---source include/start_slave.inc
---enable_connect_log
---sync_with_master
+START SLAVE IO_THREAD;
+--source include/wait_for_slave_io_to_start.inc
 
+START SLAVE SQL_THREAD;
+--let $slave_sql_errno= 1594
+--source include/wait_for_slave_sql_error.inc
+--enable_connect_log
+
+# Here we should see only table1_to_encrypt and its contents,
+# because it was logged with the initial key
 --sorted_result
 SHOW TABLES;
-
---enable_parsing
---echo # WARNING: Part of the test was disabled due to MDEV-11323
+SELECT COUNT(*) FROM table1_to_encrypt;
 
 --echo #####################################################
 --echo # Test 2: check that replication works if it starts

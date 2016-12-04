@@ -18,15 +18,7 @@ INSERT INTO table1_to_encrypt SELECT NULL,NOW(),b FROM table1_to_encrypt;
 SET binlog_format=ROW;
 INSERT INTO table1_to_encrypt SELECT NULL,NOW(),b FROM table1_to_encrypt;
 INSERT INTO table1_to_encrypt SELECT NULL,NOW(),b FROM table1_to_encrypt;
-#
-# The next step will cause a perl error if the search does not
-# meet the expectations. 
-#   Pattern to look for: table1_to_encrypt
-#   Files to search:     master-bin.0*
-#   Expected result:     0 
-# (0 means the pattern should not be found, 1 means it should be found)
-#
-Did not find any occurrences of 'table1_to_encrypt' in master-bin.0*
+NOT FOUND /table1_to_encrypt/ in master-bin.0*
 #######################################################
 # Pre-test 2: restart master with a different key value
 #######################################################
@@ -42,15 +34,7 @@ INSERT INTO table2_to_encrypt SELECT NULL,NOW(),b FROM table2_to_encrypt;
 SET binlog_format=ROW;
 INSERT INTO table2_to_encrypt SELECT NULL,NOW(),b FROM table2_to_encrypt;
 INSERT INTO table2_to_encrypt SELECT NULL,NOW(),b FROM table2_to_encrypt;
-#
-# The next step will cause a perl error if the search does not
-# meet the expectations. 
-#   Pattern to look for: table2_to_encrypt
-#   Files to search:     master-bin.0*
-#   Expected result:     0 
-# (0 means the pattern should not be found, 1 means it should be found)
-#
-Did not find any occurrences of 'table2_to_encrypt' in master-bin.0*
+NOT FOUND /table2_to_encrypt/ in master-bin.0*
 #####################################################
 # Pre-test 3: restart master again with the right key
 #####################################################
@@ -66,15 +50,31 @@ INSERT INTO table3_to_encrypt SELECT NULL,NOW(),b FROM table3_to_encrypt;
 INSERT INTO table3_to_encrypt SELECT NULL,NOW(),b FROM table3_to_encrypt;
 FLUSH BINARY LOGS;
 INSERT INTO table3_to_encrypt SELECT NULL,NOW(),b FROM table3_to_encrypt;
-# WARNING: Part of the test was disabled due to MDEV-11323
+#####################################################
+# Test 1: Check that if master has an encrypted
+#         binary log which it cannot decrypt, it 
+#         still feeds events to the slave, and SQL 
+#         thread produces an expected error upon 
+#         receiving these unreadable events .
+#         This behavior is confirmed in MDEV-11323
+#####################################################
+connection server_2;
+START SLAVE IO_THREAD;
+include/wait_for_slave_io_to_start.inc
+START SLAVE SQL_THREAD;
+include/wait_for_slave_sql_error.inc [errno=1594]
+SHOW TABLES;
+Tables_in_test
+table1_to_encrypt
+SELECT COUNT(*) FROM table1_to_encrypt;
+COUNT(*)
+8
 #####################################################
 # Test 2: check that replication works if it starts
 #         from a good binary log
 #####################################################
 connection server_2;
 include/stop_slave.inc
-Warnings:
-Note	1255	Slave already has been stopped
 RESET SLAVE ALL;
 DROP DATABASE test;
 CREATE DATABASE test;

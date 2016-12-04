@@ -148,99 +148,27 @@ DROP SERVER server_name_to_encrypt;
 #################
 # Master binlog checks
 #################
-#
-# The next step will cause a perl error if the search does not
-# meet the expectations. 
-#   Pattern to look for: _to_encrypt
-#   Files to search:     master-bin.0*
-#   Expected result:     1 
-# (0 means the pattern should not be found, 1 means it should be found)
-#
-Found occurrences of '_to_encrypt' in master-bin.0*
-#
-# The next step will cause a perl error if the search does not
-# meet the expectations. 
-#   Pattern to look for: COMMIT
-#   Files to search:     master-bin.0*
-#   Expected result:     1 
-# (0 means the pattern should not be found, 1 means it should be found)
-#
-Found occurrences of 'COMMIT' in master-bin.0*
-#
-# The next step will cause a perl error if the search does not
-# meet the expectations. 
-#   Pattern to look for: TIMESTAMP
-#   Files to search:     master-bin.0*
-#   Expected result:     1 
-# (0 means the pattern should not be found, 1 means it should be found)
-#
-Found occurrences of 'TIMESTAMP' in master-bin.0*
+FOUND /_to_encrypt/ in master-bin.0*
+FOUND /COMMIT/ in master-bin.0*
+FOUND /TIMESTAMP/ in master-bin.0*
 include/save_master_pos.inc
 #################
 # Relay log checks
 #################
 connection server_2;
 include/sync_io_with_master.inc
-#
-# The next step will cause a perl error if the search does not
-# meet the expectations. 
-#   Pattern to look for: _to_encrypt
-#   Files to search:     slave-relay-bin.0*
-#   Expected result:     0 
-# (0 means the pattern should not be found, 1 means it should be found)
-#
-Did not find any occurrences of '_to_encrypt' in slave-relay-bin.0*
-#
-# The next step will cause a perl error if the search does not
-# meet the expectations. 
-#   Pattern to look for: COMMIT
-#   Files to search:     slave-relay-bin.0*
-#   Expected result:     0 
-# (0 means the pattern should not be found, 1 means it should be found)
-#
-Did not find any occurrences of 'COMMIT' in slave-relay-bin.0*
-#
-# The next step will cause a perl error if the search does not
-# meet the expectations. 
-#   Pattern to look for: TIMESTAMP
-#   Files to search:     slave-relay-bin.0*
-#   Expected result:     0 
-# (0 means the pattern should not be found, 1 means it should be found)
-#
-Did not find any occurrences of 'TIMESTAMP' in slave-relay-bin.0*
+NOT FOUND /_to_encrypt/ in slave-relay-bin.0*
+NOT FOUND /COMMIT/ in slave-relay-bin.0*
+NOT FOUND /TIMESTAMP/ in slave-relay-bin.0*
 #################
 # Slave binlog checks
 #################
 include/start_slave.inc
 include/sync_slave_sql_with_io.inc
 include/sync_io_with_master.inc
-#
-# The next step will cause a perl error if the search does not
-# meet the expectations. 
-#   Pattern to look for: _to_encrypt
-#   Files to search:     slave-bin.0*
-#   Expected result:     0 
-# (0 means the pattern should not be found, 1 means it should be found)
-#
-Did not find any occurrences of '_to_encrypt' in slave-bin.0*
-#
-# The next step will cause a perl error if the search does not
-# meet the expectations. 
-#   Pattern to look for: COMMIT
-#   Files to search:     slave-bin.0*
-#   Expected result:     0 
-# (0 means the pattern should not be found, 1 means it should be found)
-#
-Did not find any occurrences of 'COMMIT' in slave-bin.0*
-#
-# The next step will cause a perl error if the search does not
-# meet the expectations. 
-#   Pattern to look for: TIMESTAMP
-#   Files to search:     slave-bin.0*
-#   Expected result:     0 
-# (0 means the pattern should not be found, 1 means it should be found)
-#
-Did not find any occurrences of 'TIMESTAMP' in slave-bin.0*
+NOT FOUND /_to_encrypt/ in slave-bin.0*
+NOT FOUND /COMMIT/ in slave-bin.0*
+NOT FOUND /TIMESTAMP/ in slave-bin.0*
 ##########
 # Cleanup
 ##########

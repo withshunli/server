@@ -1,1 +1,2 @@
 encrypted_master_switch_to_unencrypted : MDEV-11288 (server crash)
+binlog_incident                        : MDEV-11319 (mysqlbinlog crash or failure)
