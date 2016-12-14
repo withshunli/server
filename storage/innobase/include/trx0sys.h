@@ -365,7 +365,7 @@ trx_sys_get_n_rw_trx(void);
 Check if there are any active (non-prepared) transactions.
 @return total number of active transactions or 0 if none */
 ulint
-trx_sys_any_active_transactions(void);
+trx_sys_any_active_transactions(bool x=0);
 /*=================================*/
 #else /* !UNIV_HOTBACKUP */
 /*****************************************************************//**

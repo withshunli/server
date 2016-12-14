@@ -342,7 +342,7 @@ thd_destructor_proxy(void *)
 
 	srv_fast_shutdown = (ulint) innobase_fast_shutdown;
 	if (srv_fast_shutdown == 0) {
-		while (trx_sys_any_active_transactions()) {
+		while (trx_sys_any_active_transactions(1)) {
 			os_thread_sleep(1000);
 		}
 

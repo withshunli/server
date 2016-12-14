@@ -1390,7 +1390,7 @@ trx_undo_fake_prepared(
 Check if there are any active (non-prepared) transactions.
 @return total number of active transactions or 0 if none */
 ulint
-trx_sys_any_active_transactions(void)
+trx_sys_any_active_transactions(bool with_prepared)
 /*=================================*/
 {
 	trx_sys_mutex_enter();
@@ -1431,7 +1431,9 @@ trx_sys_any_active_transactions(void)
 		}
 
 		ut_a(total_trx >= trx_sys->n_prepared_trx);
-		total_trx -= trx_sys->n_prepared_trx;
+		if (!with_prepared) {
+			total_trx -= trx_sys->n_prepared_trx;
+		}
 	}
 
 	trx_sys_mutex_exit();
