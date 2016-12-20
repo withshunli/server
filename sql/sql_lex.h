@@ -727,7 +727,7 @@ public:
 
   void set_unique_exclude();
 
-  friend class LEX;
+  friend struct LEX;
   friend int subselect_union_engine::exec();
 
   List<Item> *get_column_types(bool for_cursor);
@@ -1032,7 +1032,7 @@ public:
   */
   ha_rows get_limit();
 
-  friend class LEX;
+  friend struct LEX;
   st_select_lex() : group_list_ptrs(NULL), braces(0),
   n_sum_items(0), n_child_sum_items(0)
   {}
