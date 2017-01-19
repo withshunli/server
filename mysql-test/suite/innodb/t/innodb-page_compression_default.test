@@ -1,5 +1,5 @@
 --source include/have_innodb.inc
-
+--source include/not_windows.inc
 --disable_query_log
 let $innodb_compression_algorithm_orig=`SELECT @@innodb_compression_algorithm`;
 let $innodb_file_format_orig = `SELECT @@innodb_file_format`;

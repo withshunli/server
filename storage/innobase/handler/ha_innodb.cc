@@ -19756,6 +19756,13 @@ static MYSQL_SYSVAR_BOOL(force_primary_key,
   "Do not allow to create table without primary key (off by default)",
   NULL, NULL, FALSE);
 
+
+static MYSQL_SYSVAR_BOOL(use_filesystem_compression, srv_use_filesystem_compression,
+  PLUGIN_VAR_NOCMDARG,
+  "Use filesystem compression for page_compression (currently supported only on Windows)",
+  NULL, NULL, IF_WIN(TRUE,FALSE));
+
+
 static MYSQL_SYSVAR_BOOL(use_trim, srv_use_trim,
   PLUGIN_VAR_OPCMDARG,
   "Use trim. Default FALSE.",
@@ -19773,8 +19780,11 @@ static MYSQL_SYSVAR_ENUM(compression_algorithm, innodb_compression_algorithm,
   innodb_compression_algorithm_validate, NULL,
   /* We use here the largest number of supported compression method to
   enable all those methods that are available. Availability of compression
-  method is verified on innodb_compression_algorithm_validate function. */
-  PAGE_ZLIB_ALGORITHM,
+  method is verified on innodb_compression_algorithm_validate function.
+  On Windows, default is no compression, because we rely on NTFS
+  compression by default.
+  */
+  IF_WIN(PAGE_UNCOMPRESSED,PAGE_ZLIB_ALGORITHM),
   &page_compression_algorithms_typelib);
 
 static MYSQL_SYSVAR_LONG(mtflush_threads, srv_mtflush_threads,
@@ -20095,6 +20105,9 @@ static struct st_mysql_sys_var* innobase_system_variables[]= {
   MYSQL_SYSVAR(fatal_semaphore_wait_threshold),
   /* Table page compression feature */
   MYSQL_SYSVAR(use_trim),
+#ifdef _WIN32
+  MYSQL_SYSVAR(use_filesystem_compression),
+#endif
   MYSQL_SYSVAR(compression_algorithm),
   MYSQL_SYSVAR(mtflush_threads),
   MYSQL_SYSVAR(use_mtflush),

@@ -164,6 +164,8 @@ UNIV_INTERN my_bool	srv_numa_interleave = FALSE;
 /* If this flag is TRUE, then we will use fallocate(PUCH_HOLE)
 to the pages */
 UNIV_INTERN my_bool	srv_use_trim = FALSE;
+/* If this flag is TRUE, use filesystem transparent compression.*/
+UNIV_INTERN my_bool	srv_use_filesystem_compression = FALSE;
 /* If this flag is TRUE, then we will use posix fallocate for file extentsion */
 UNIV_INTERN my_bool	srv_use_posix_fallocate = FALSE;
 /* If this flag is TRUE, then we disable doublewrite buffer */

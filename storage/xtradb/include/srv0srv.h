@@ -313,6 +313,9 @@ extern ibool	srv_use_native_conditions;
 /* Use trim operation */
 extern my_bool srv_use_trim;
 
+/* Use filesystem compression */
+extern my_bool srv_use_filesystem_compression;
+
 /* Use posix fallocate */
 extern my_bool srv_use_posix_fallocate;
 

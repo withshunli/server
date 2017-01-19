@@ -285,6 +285,9 @@ extern my_bool	srv_numa_interleave;
 /* Use trim operation */
 extern my_bool srv_use_trim;
 
+/* Use filesystem compression */
+extern my_bool srv_use_filesystem_compression;
+
 /* Use posix fallocate */
 #ifdef HAVE_POSIX_FALLOCATE
 extern my_bool srv_use_posix_fallocate;

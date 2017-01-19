@@ -1374,6 +1374,21 @@ os_file_get_block_size(
 	os_file_t	file,	/*!< in: handle to a file */
 	const char*	name);	/*!< in: file name */
 
+/*
+Can given file be transparently compressed?
+@return true if file can be compressed.
+*/
+UNIV_INTERN bool os_file_supports_compression(
+	os_file_t file); /* !< in: file handle */
+
+/*
+Set compression state for transparent compression (assuming file system supports it)
+@return true on success, false on error.
+*/
+UNIV_INTERN bool os_file_set_compression_state(
+	os_file_t file, /* !< in: file handle */
+	bool compress); /* !< in: true to make file compressed, false to make it uncompressed. */
+
 #ifndef UNIV_NONINL
 #include "os0file.ic"
 #endif

@@ -186,6 +186,9 @@ UNIV_INTERN long        srv_compress_zlib_level         = 6;
 /* If this flag is TRUE, then we will use fallocate(PUCH_HOLE)
 to the pages */
 UNIV_INTERN my_bool     srv_use_trim                    = FALSE;
+/* If this flag is TRUE, then we will use transparent filesystem
+compression for page_compressed=1. */
+UNIV_INTERN my_bool     srv_use_filesystem_compression  = FALSE;
 /* If this flag is TRUE, then we will use posix fallocate for file extentsion */
 UNIV_INTERN my_bool     srv_use_posix_fallocate         = FALSE;
 /* If this flag is TRUE, then we disable doublewrite buffer */

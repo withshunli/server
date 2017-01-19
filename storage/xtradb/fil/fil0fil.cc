@@ -3777,6 +3777,7 @@ fil_create_new_single_table_tablespace(
 	bool		is_temp = !!(flags2 & DICT_TF2_TEMPORARY);
 	bool		has_data_dir = FSP_FLAGS_HAS_DATA_DIR(flags) != 0;
 	ulint		atomic_writes = FSP_FLAGS_GET_ATOMIC_WRITES(flags);
+	bool		has_compression = (FSP_FLAGS_HAS_PAGE_COMPRESSION(flags) != 0);
 	fil_space_crypt_t *crypt_data = NULL;
 
 	ut_a(space_id > 0);
@@ -3812,6 +3813,15 @@ fil_create_new_single_table_tablespace(
 		OS_DATA_FILE,
 		&ret,
 		atomic_writes);
+
+	if (has_compression 
+		&& srv_use_filesystem_compression
+		&& os_file_supports_compression(file)) {
+		if (!os_file_set_compression_state(file,true)) {
+			ib_logf(IB_LOG_LEVEL_WARN,
+				"Cannot set compression on file '%s'\n", path);
+		}
+	}
 
 	if (ret == FALSE) {
 		/* The following call will print an error message */

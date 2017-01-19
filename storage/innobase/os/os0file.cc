@@ -68,6 +68,10 @@ Created 10/21/1995 Heikki Tuuri
 #include <libaio.h>
 #endif
 
+#ifdef _WIN32
+#include <winioctl.h>
+#endif
+
 #if defined(UNIV_LINUX) && defined(HAVE_SYS_IOCTL_H)
 # include <sys/ioctl.h>
 # ifndef DFS_IOCTL_ATOMIC_WRITE_SET
@@ -112,7 +116,7 @@ UNIV_INTERN ulint	os_innodb_umask = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP;
 #else
 /** Umask for creating files */
 UNIV_INTERN ulint	os_innodb_umask	= 0;
-#define ECANCELED  125
+
 #endif /* __WIN__ */
 
 #ifndef UNIV_HOTBACKUP
@@ -6200,21 +6204,95 @@ os_aio_all_slots_free(void)
 #endif /* UNIV_DEBUG */
 
 #ifdef _WIN32
-#include <winioctl.h>
-#ifndef FSCTL_FILE_LEVEL_TRIM
-#define FSCTL_FILE_LEVEL_TRIM  CTL_CODE(FILE_DEVICE_FILE_SYSTEM, 130, METHOD_BUFFERED, FILE_WRITE_DATA)
-typedef struct _FILE_LEVEL_TRIM_RANGE {
-  DWORDLONG Offset;
-  DWORDLONG Length;
-} FILE_LEVEL_TRIM_RANGE, *PFILE_LEVEL_TRIM_RANGE;
+/**
+Wrapper around Windows DeviceIoControl() function.
 
-typedef struct _FILE_LEVEL_TRIM {
-  DWORD                 Key;
-  DWORD                 NumRanges;
-  FILE_LEVEL_TRIM_RANGE Ranges[1];
-} FILE_LEVEL_TRIM, *PFILE_LEVEL_TRIM;
+Works synchronously, also in case for handle opened
+for async access (i.e with FILE_FLAG_OVERLAPPED).
+
+Accepts the same parameters as DeviceIoControl(),except
+last parameter (OVERLAPPED).
+*/
+static
+BOOL
+os_win32_device_io_control(
+	HANDLE handle,
+	DWORD code,
+	LPVOID inbuf,
+	DWORD inbuf_size,
+	LPVOID outbuf,
+	DWORD outbuf_size,
+	LPDWORD bytes_returned
+)
+{
+	OVERLAPPED overlapped = { 0 };
+  overlapped.hEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
+	BOOL result = DeviceIoControl(handle, code, inbuf, inbuf_size, outbuf,
+		outbuf_size, bytes_returned, &overlapped);
+
+	if (!result && (GetLastError() == ERROR_IO_PENDING)) {
+		/* Wait for async io to complete */
+		result = GetOverlappedResult(handle, &overlapped, bytes_returned, TRUE);
+	}
+  CloseHandle(overlapped.hEvent);
+	return result;
+}
+
+/*
+	Check whether file system supports transparent compression.
+	This is usually true for NTFS, but not for large cluster sizes.
+*/
+static bool os_win32_supports_compression(HANDLE file)
+{
+	DWORD flags;
+
+	if (!GetVolumeInformationByHandleW(file, NULL, 0, NULL, NULL, &flags, NULL, 0)) {
+		return false;
+	}
+	return (flags & FILE_FILE_COMPRESSION) != 0;
+}
+
+
+/* Set compression attribute on a file.*/
+static bool os_win32_set_compression_state(HANDLE file, bool compress_file)
+{
+	static bool warning_written = false;
+	USHORT fmt = compress_file ? COMPRESSION_FORMAT_DEFAULT : COMPRESSION_FORMAT_NONE;
+	DWORD temp;
+	BOOL success = os_win32_device_io_control(
+		file, FSCTL_SET_COMPRESSION, &fmt, sizeof(fmt), NULL, 0,
+		&temp);
+	return (success != 0);
+}
+
 #endif
+
+/* Check whether file system supports transparent compression
+for given file.*/
+UNIV_INTERN bool os_file_supports_compression(os_file_t file)
+{
+#ifdef _WIN32
+	return os_win32_supports_compression(file);
+#else
+	/* Some filesystems on Linux support transparent per-file compression,
+	for example btrfs.
+	However there is no good way check compression ratio.
+	Since punch hole is also supported for btrfs, so
+	So we do not try to deal with it for now.*/
+	return false;
 #endif
+}
+
+/* Set compression state for a given file.*/
+UNIV_INTERN bool os_file_set_compression_state(os_file_t file, bool compress)
+{
+#ifdef _WIN32
+	return os_win32_set_compression_state(file, compress);
+#else
+	return false;
+#endif
+}
+
 
 /**********************************************************************//**
 Directly manipulate the allocated disk space by deallocating for the file referred to
@@ -6303,40 +6381,6 @@ os_file_trim(
 	}
 
 #endif /* HAVE_FALLOC_PUNCH_HOLE_AND_KEEP_SIZE ... */
-
-#elif defined(_WIN32)
-	FILE_LEVEL_TRIM flt;
-	flt.Key = 0;
-	flt.NumRanges = 1;
-	flt.Ranges[0].Offset = off;
-	flt.Ranges[0].Length = trim_len;
-
-	BOOL ret = DeviceIoControl(slot->file, FSCTL_FILE_LEVEL_TRIM,
-		&flt, sizeof(flt), NULL, NULL, NULL, NULL);
-
-	if (!ret) {
-		/* After first failure do not try to trim again */
-		os_fallocate_failed = TRUE;
-		srv_use_trim=FALSE;
-		ut_print_timestamp(stderr);
-		fprintf(stderr,
-			"  InnoDB: Warning: fallocate call failed with error.\n"
-			"  InnoDB: start: %lu len: %lu payload: %lu\n"
-			"  InnoDB: Disabling fallocate for now.\n", off, trim_len, len);
-
-		os_file_handle_error_no_exit(slot->name,
-			" DeviceIOControl(FSCTL_FILE_LEVEL_TRIM) ",
-			FALSE, __FILE__, __LINE__);
-
-		if (slot->write_size) {
-			*slot->write_size = 0;
-		}
-		return (FALSE);
-	} else {
-		if (slot->write_size) {
-			*slot->write_size = len;
-		}
-	}
 #endif
 
 	switch(bsize) {

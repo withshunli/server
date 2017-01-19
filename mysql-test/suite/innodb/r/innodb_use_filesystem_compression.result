@@ -1,0 +1,7 @@
+SET GLOBAL innodb_file_format = `Barracuda`;
+SET GLOBAL innodb_file_per_table = default;
+SET GLOBAL innodb_use_filesystem_compression = default;
+CREATE TABLE compressed(i int) ENGINE=InnoDB page_compressed=1;
+CREATE TABLE uncompressed(i int) ENGINE=InnoDB page_compressed=0;
+DROP TABLE compressed;
+DROP TABLE uncompressed;
