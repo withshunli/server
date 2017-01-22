@@ -814,6 +814,24 @@ int Explain_basic_join::print_explain(Explain_query *query,
 }
 
 
+void Explain_select::add_linkage(Json_writer *writer)
+{
+  switch (linkage)
+  {
+     case UNION_TYPE:
+       writer->add_member("operation").add_str("UNION");
+       break;
+     case INTERSECT_TYPE:
+       writer->add_member("operation").add_str("INTERSECT");
+       break;
+     case EXCEPT_TYPE:
+       writer->add_member("operation").add_str("EXCEPT");
+       break;
+     default:
+       break;
+  }
+}
+
 void Explain_select::print_explain_json(Explain_query *query, 
                                         Json_writer *writer, bool is_analyze)
 {
@@ -825,6 +843,7 @@ void Explain_select::print_explain_json(Explain_query *query,
   {
     writer->add_member("query_block").start_object();
     writer->add_member("select_id").add_ll(select_id);
+    add_linkage(writer);
 
     writer->add_member("table").start_object();
     writer->add_member("message").add_str(message);
@@ -837,6 +856,7 @@ void Explain_select::print_explain_json(Explain_query *query,
   {
     writer->add_member("query_block").start_object();
     writer->add_member("select_id").add_ll(select_id);
+    add_linkage(writer);
 
     if (is_analyze && time_tracker.get_loops())
     {
