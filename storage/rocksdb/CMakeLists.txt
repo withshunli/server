@@ -27,7 +27,7 @@ ELSEIF (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
      (CLANG_VERSION_STRING AND CLANG_VERSION_STRING VERSION_LESS  3.3))
     SKIP_ROCKSDB_PLUGIN("${OLD_COMPILER_MSG}")
   ENDIF()
-  SET(CXX11_FLAGS "-stdlib=libc++")
+  SET(CXX11_FLAGS "-stdlib=libc++ -std=c++11")
 ELSEIF(MSVC)
   IF (MSVC_VERSION LESS 1900)
     SKIP_ROCKSDB_PLUGIN("${OLD_COMPILER_MSG}")
@@ -142,6 +142,9 @@ IF(MSVC)
   # additional const qualifiers to parameters of the overriden virtual functions
   # This creates a lot of warnings, that we silence here.
   ADD_DEFINITIONS(/wd4373)
+
+  # Some checks in C++ runtime that make debug build much slower
+  ADD_DEFINITIONS(-D_ITERATOR_DEBUG_LEVEL=0)
 ENDIF()
 
 # Optional compression libraries.
