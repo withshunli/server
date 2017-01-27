@@ -695,7 +695,7 @@ static MYSQL_SYSVAR_INT(max_open_files,
   nullptr, nullptr, rocksdb_db_options.max_open_files,
   /* min */ -1, /* max */ INT_MAX, 0);
 
-static MYSQL_SYSVAR_ULONGLONG(max_total_wal_size,
+static MYSQL_SYSVAR_UINT64_T(max_total_wal_size,
   rocksdb_db_options.max_total_wal_size,
   PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,
   "DBOptions::max_total_wal_size for RocksDB",
@@ -719,7 +719,7 @@ static MYSQL_SYSVAR_STR(wal_dir, rocksdb_wal_dir,
   "DBOptions::wal_dir for RocksDB",
   nullptr, nullptr, rocksdb_db_options.wal_dir.c_str());
 
-static MYSQL_SYSVAR_ULONGLONG(delete_obsolete_files_period_micros,
+static MYSQL_SYSVAR_UINT64_T(delete_obsolete_files_period_micros,
   rocksdb_db_options.delete_obsolete_files_period_micros,
   PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,
   "DBOptions::delete_obsolete_files_period_micros for RocksDB",
@@ -775,7 +775,7 @@ static MYSQL_SYSVAR_SIZE_T(keep_log_file_num,
   nullptr, nullptr, rocksdb_db_options.keep_log_file_num,
   /* min */ 0L, /* max */ SIZE_T_MAX, 0);
 
-static MYSQL_SYSVAR_ULONGLONG(max_manifest_file_size,
+static MYSQL_SYSVAR_UINT64_T(max_manifest_file_size,
   rocksdb_db_options.max_manifest_file_size,
   PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,
   "DBOptions::max_manifest_file_size for RocksDB",
@@ -789,14 +789,14 @@ static MYSQL_SYSVAR_INT(table_cache_numshardbits,
   nullptr, nullptr, rocksdb_db_options.table_cache_numshardbits,
   /* min */ 0, /* max */ INT_MAX, 0);
 
-static MYSQL_SYSVAR_ULONGLONG(wal_ttl_seconds,
+static MYSQL_SYSVAR_UINT64_T(wal_ttl_seconds,
   rocksdb_db_options.WAL_ttl_seconds,
   PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,
   "DBOptions::WAL_ttl_seconds for RocksDB",
   nullptr, nullptr, rocksdb_db_options.WAL_ttl_seconds,
   /* min */ 0L, /* max */ LONGLONG_MAX, 0);
 
-static MYSQL_SYSVAR_ULONGLONG(wal_size_limit_mb,
+static MYSQL_SYSVAR_UINT64_T(wal_size_limit_mb,
   rocksdb_db_options.WAL_size_limit_MB,
   PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,
   "DBOptions::WAL_size_limit_MB for RocksDB",
@@ -866,14 +866,14 @@ static MYSQL_SYSVAR_BOOL(use_adaptive_mutex,
   "DBOptions::use_adaptive_mutex for RocksDB",
   nullptr, nullptr, rocksdb_db_options.use_adaptive_mutex);
 
-static MYSQL_SYSVAR_ULONGLONG(bytes_per_sync,
+static MYSQL_SYSVAR_UINT64_T(bytes_per_sync,
   rocksdb_db_options.bytes_per_sync,
   PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,
   "DBOptions::bytes_per_sync for RocksDB",
   nullptr, nullptr, rocksdb_db_options.bytes_per_sync,
   /* min */ 0L, /* max */ ULONGLONG_MAX, 0);
 
-static MYSQL_SYSVAR_ULONGLONG(wal_bytes_per_sync,
+static MYSQL_SYSVAR_UINT64_T(wal_bytes_per_sync,
   rocksdb_db_options.wal_bytes_per_sync,
   PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,
   "DBOptions::wal_bytes_per_sync for RocksDB",
@@ -3097,7 +3097,7 @@ class Rdb_snapshot_status : public Rdb_tx_list_walker
       m_data += format_string("---SNAPSHOT, ACTIVE %lld sec\n"
                               "%s\n"
                               "lock count %llu, write count %llu\n",
-                              curr_time - snapshot_timestamp,
+                              (longlong)(curr_time - snapshot_timestamp),
                               buffer,
                               tx->get_lock_count(), tx->get_write_count());
     }
@@ -3308,19 +3308,19 @@ static bool rocksdb_show_status(handlerton* const hton,
     rocksdb::MemoryUtil::GetApproximateMemoryUsageByType(
       dbs, cache_set, &temp_usage_by_type);
     snprintf(buf, sizeof(buf), "\nMemTable Total: %llu",
-             temp_usage_by_type[rocksdb::MemoryUtil::kMemTableTotal]);
+             (ulonglong)temp_usage_by_type[rocksdb::MemoryUtil::kMemTableTotal]);
     str.append(buf);
     snprintf(buf, sizeof(buf), "\nMemTable Unflushed: %llu",
-             temp_usage_by_type[rocksdb::MemoryUtil::kMemTableUnFlushed]);
+             (ulonglong)temp_usage_by_type[rocksdb::MemoryUtil::kMemTableUnFlushed]);
     str.append(buf);
     snprintf(buf, sizeof(buf), "\nTable Readers Total: %llu",
-             temp_usage_by_type[rocksdb::MemoryUtil::kTableReadersTotal]);
+             (ulonglong)temp_usage_by_type[rocksdb::MemoryUtil::kTableReadersTotal]);
     str.append(buf);
     snprintf(buf, sizeof(buf), "\nCache Total: %llu",
-             temp_usage_by_type[rocksdb::MemoryUtil::kCacheTotal]);
+             (ulonglong)temp_usage_by_type[rocksdb::MemoryUtil::kCacheTotal]);
     str.append(buf);
     snprintf(buf, sizeof(buf), "\nDefault Cache Capacity: %llu",
-             (unsigned long long)internal_cache_count * kDefaultInternalCacheSize);
+             (ulonglong)internal_cache_count * kDefaultInternalCacheSize);
     str.append(buf);
     res |= print_stats(thd, "Memory_Stats", "rocksdb", str, stat_print);
   }

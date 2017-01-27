@@ -18,8 +18,8 @@ list(APPEND CMAKE_MODULE_PATH "${ROCKSDB_SOURCE_DIR}/cmake/modules/")
 if(WIN32)
   # include(${ROCKSDB_SOURCE_DIR}/thirdparty.inc)
 else()
-  option(WITH_JEMALLOC "build with JeMalloc" OFF)
-  if(WITH_JEMALLOC)
+  option(WITH_ROCKSDB_JEMALLOC "build RocksDB with JeMalloc" OFF)
+  if(WITH_ROCKSDB_JEMALLOC)
     find_package(JeMalloc REQUIRED)
     add_definitions(-DROCKSDB_JEMALLOC)
     include_directories(${JEMALLOC_INCLUDE_DIR})
@@ -29,8 +29,8 @@ else()
     add_definitions(-DROCKSDB_JEMALLOC)
     set(WITH_JEMALLOC ON)
   endif()
-  option(WITH_SNAPPY "build with SNAPPY" OFF)
-  if(WITH_SNAPPY)
+  option(WITH_ROCKSDB_SNAPPY "build RocksDB with SNAPPY" OFF)
+  if(WITH_ROCKSDB_SNAPPY)
     find_package(snappy REQUIRED)
     add_definitions(-DSNAPPY)
     include_directories(${SNAPPY_INCLUDE_DIR})
@@ -39,9 +39,7 @@ else()
 endif()
 
 
-if(CMAKE_COMPILER_IS_GNUCXX)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-builtin-memcmp -frtti")
-endif()
+
 
 
 if(CMAKE_SYSTEM_NAME MATCHES "Cygwin")
@@ -259,7 +257,6 @@ set(ROCKSDB_SOURCES
         util/transaction_test_util.cc
         util/xfunc.cc
         util/xxhash.cc
-        util/build_version.cc
         utilities/backupable/backupable_db.cc
         utilities/blob_db/blob_db.cc
         utilities/checkpoint/checkpoint.cc
@@ -325,6 +322,16 @@ FOREACH(s ${ROCKSDB_SOURCES})
   list(APPEND SOURCES ${ROCKSDB_SOURCE_DIR}/${s})
 ENDFOREACH()
 
+IF(CMAKE_VERSION VERSION_GREATER "2.8.10")
+  STRING(TIMESTAMP GIT_DATE_TIME "%Y-%m-%d %H:%M:%S")
+ENDIF()
+
+CONFIGURE_FILE(${ROCKSDB_SOURCE_DIR}/util/build_version.cc.in build_version.cc @ONLY)
+INCLUDE_DIRECTORIES(${ROCKSDB_SOURCE_DIR}/util)
+list(APPEND SOURCES ${CMAKE_CURRENT_BINARY_DIR}/build_version.cc)
+
 ADD_CONVENIENCE_LIBRARY(rocksdblib STATIC ${SOURCES})
 target_link_libraries(rocksdblib ${THIRDPARTY_LIBS} ${SYSTEM_LIBS})
-
+if(CMAKE_COMPILER_IS_GNUCXX)
+  set_target_properties(rocksdblib PROPERTIES COMPILE_FLAGS "-fno-builtin-memcmp -frtti")
+endif()

@@ -797,7 +797,7 @@ static int rdb_i_s_global_info_fill_table(
   char gtid_buf[GTID_BUF_LEN]= {0};
 
   if (blm->read(file_buf, &pos, gtid_buf)) {
-    snprintf(pos_buf, INT_BUF_LEN, "%llu", (uint64_t) pos);
+    snprintf(pos_buf, INT_BUF_LEN, "%llu", (ulonglong) pos);
     ret |= rdb_global_info_fill_row(thd, tables, "BINLOG", "FILE", file_buf);
     ret |= rdb_global_info_fill_row(thd, tables, "BINLOG", "POS", pos_buf);
     ret |= rdb_global_info_fill_row(thd, tables, "BINLOG", "GTID", gtid_buf);

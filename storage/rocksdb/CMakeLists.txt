@@ -126,7 +126,7 @@ ADD_LIBRARY(rocksdb_tools STATIC
 )
 
 MYSQL_ADD_EXECUTABLE(sst_dump rocksdb/tools/sst_dump.cc)
-TARGET_LINK_LIBRARIES(sst_dump rocksdb_tools rocksdblib)
+TARGET_LINK_LIBRARIES(sst_dump rocksdblib)
 
 MYSQL_ADD_EXECUTABLE(ldb rocksdb/tools/ldb.cc)
 TARGET_LINK_LIBRARIES(ldb rocksdb_tools rocksdblib)
