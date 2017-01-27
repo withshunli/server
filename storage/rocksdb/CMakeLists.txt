@@ -62,7 +62,7 @@ SET(ROCKSDB_SE_SOURCES
   rdb_threads.h
 )
 
-MYSQL_ADD_PLUGIN(rocksdb_se ${ROCKSDB_SE_SOURCES} STORAGE_ENGINE)
+MYSQL_ADD_PLUGIN(rocksdb_se ${ROCKSDB_SE_SOURCES} STORAGE_ENGINE MODULE_OUTPUT_NAME ha_rocksdb)
 
 IF(NOT TARGET rocksdb_se)
   # Bail out if compilation with rocksdb engine is not requested
