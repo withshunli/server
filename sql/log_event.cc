@@ -52,6 +52,7 @@
 #include "rpl_constants.h"
 #include "sql_digest.h"
 #include "zlib.h"
+#include "my_atomic.h"
 
 #define my_b_write_string(A, B) my_b_write((A), (uchar*)(B), (uint) (sizeof(B) - 1))
 
@@ -7594,6 +7595,13 @@ Gtid_log_event::do_apply_event(rpl_group_info *rgi)
   }
 
   DBUG_ASSERT((bits & OPTION_GTID_BEGIN) == 0);
+
+  Master_info *mi=rgi->rli->mi;
+  if (flags2 & FL_DDL)
+    my_atomic_add64_explicit(&mi->total_ddl_events, 1, MY_MEMORY_ORDER_RELAXED);
+  if (!(flags & FL_TRANSACTIONAL))
+    my_atomic_add64_explicit(&mi->total_non_trans_events, 1, MY_MEMORY_ORDER_RELAXED);
+
   if (flags2 & FL_STANDALONE)
     return 0;
 

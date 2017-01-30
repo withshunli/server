@@ -2808,6 +2808,15 @@ void show_master_info_get_fields(THD *thd, List<Item> *field_list,
   field_list->push_back(new (mem_root)
                         Item_empty_string(thd, "Slave_SQL_Running_State",
                                           20));
+  field_list->push_back(new (mem_root)
+                       Item_return_int(thd, "Slave_DDL_Events", 20,
+                                       MYSQL_TYPE_LONGLONG),
+                       mem_root);
+  field_list->push_back(new (mem_root)
+                       Item_return_int(thd, "Slave_Non_Transactional_Events", 20,
+                                       MYSQL_TYPE_LONGLONG),
+                        mem_root);
+
   if (full)
   {
     field_list->push_back(new (mem_root)
@@ -3035,6 +3044,12 @@ static bool send_show_master_info_data(THD *thd, Master_info *mi, bool full,
       protocol->store_null();
     // Slave_SQL_Running_State
     protocol->store(slave_sql_running_state, &my_charset_bin);
+
+    uint64 events;
+    events= (uint64)my_atomic_load64_explicit((volatile int64 *)&mi->total_ddl_events, MY_MEMORY_ORDER_RELAXED);
+    protocol->store(events);
+    events= (uint64)my_atomic_load64_explicit((volatile int64 *)&mi->total_non_trans_events, MY_MEMORY_ORDER_RELAXED);
+    protocol->store(events);
 
     if (full)
     {

@@ -303,6 +303,12 @@ class Master_info : public Slave_reporting_capability
 
   /* The parallel replication mode. */
   enum_slave_parallel_mode parallel_mode;
+
+  /* No of DDL event group */
+  volatile uint64 total_ddl_events;
+
+  /* No of non-transactional event group*/
+  volatile uint64 total_non_trans_events;
 };
 
 int init_master_info(Master_info* mi, const char* master_info_fname,

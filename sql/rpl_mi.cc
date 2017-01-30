@@ -40,7 +40,8 @@ Master_info::Master_info(LEX_STRING *connection_name_arg,
    sync_counter(0), heartbeat_period(0), received_heartbeats(0),
    master_id(0), prev_master_id(0),
    using_gtid(USE_GTID_NO), events_queued_since_last_gtid(0),
-   gtid_reconnect_event_skip_count(0), gtid_event_seen(false)
+   gtid_reconnect_event_skip_count(0), gtid_event_seen(false),
+   total_ddl_events(0), total_non_trans_events(0)
 {
   host[0] = 0; user[0] = 0; password[0] = 0;
   ssl_ca[0]= 0; ssl_capath[0]= 0; ssl_cert[0]= 0;
