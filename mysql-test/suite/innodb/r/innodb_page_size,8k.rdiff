@@ -1,0 +1,7 @@
+--- /data/src/bb-10.2-elenst/mysql-test/suite/innodb/r/innodb_page_size.result	2017-02-10 17:19:35.998098072 +0200
++++ /data/src/bb-10.2-elenst/mysql-test/suite/innodb/r/innodb_page_size.reject	2017-02-10 17:27:02.770095902 +0200
+@@ -1,3 +1,3 @@
+ select @@innodb_page_size;
+ @@innodb_page_size
+-16384
++8192
