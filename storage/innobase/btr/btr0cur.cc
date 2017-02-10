@@ -2298,6 +2298,15 @@ any_extern:
 		rec = page_cur_get_rec(page_cursor);
 	}
 
+	/* We limit max record size to 16k for 64k page size. */
+	if (dict_tf_get_rec_format(index->table->flags) == REC_FORMAT_REDUNDANT
+	    && new_rec_size > REDUNDANT_REC_MAX_DATA_SIZE) {
+		ut_ad(srv_page_size == UNIV_PAGE_SIZE_MAX);
+		err = DB_OVERFLOW;
+
+		goto func_exit;
+	}
+
 	if (UNIV_UNLIKELY(new_rec_size
 			  >= (page_get_free_space_of_empty(page_is_comp(page))
 			      / 2))) {

@@ -1973,18 +1973,26 @@ convert_error_code_to_mysql(
 
 	case DB_TOO_BIG_RECORD: {
 		/* If prefix is true then a 768-byte prefix is stored
-		locally for BLOB fields. Refer to dict_table_get_format() */
+		locally for BLOB fields. Refer to dict_table_get_format().
+		We limit max record size to 16k for 64k page size for
+		row format REDUNDANT. */
 		bool prefix = (dict_tf_get_format(flags) == UNIV_FORMAT_A);
 		my_printf_error(ER_TOO_BIG_ROWSIZE,
 			"Row size too large (> %lu). Changing some columns "
 			"to TEXT or BLOB %smay help. In current row "
 			"format, BLOB prefix of %d bytes is stored inline.",
 			MYF(0),
-			page_get_free_space_of_empty(flags &
+			srv_page_size == UNIV_PAGE_SIZE_MAX
+			? REDUNDANT_REC_MAX_DATA_SIZE
+			: page_get_free_space_of_empty(flags &
 				DICT_TF_COMPACT) / 2,
-			prefix ? "or using ROW_FORMAT=DYNAMIC "
-			"or ROW_FORMAT=COMPRESSED ": "",
-			prefix ? DICT_MAX_FIXED_COL_LEN : 0);
+			prefix
+			? "or using ROW_FORMAT=DYNAMIC or"
+			  " ROW_FORMAT=COMPRESSED "
+			: "",
+			prefix
+			? DICT_MAX_FIXED_COL_LEN
+			: 0);
 		return(HA_ERR_TO_BIG_ROW);
 	}
 
