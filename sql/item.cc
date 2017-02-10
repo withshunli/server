@@ -9478,7 +9478,7 @@ Item *Item_cache_int::convert_to_basic_const_item(THD *thd)
 
 Item_cache_temporal::Item_cache_temporal(THD *thd,
                                          enum_field_types field_type_arg):
-  Item_cache_int(thd, field_type_arg)
+  Item_cache_int(thd, field_type_arg), cached_temporal_item_name(NULL)
 {
   if (mysql_type_to_time_type(Item_cache_temporal::field_type()) ==
                               MYSQL_TIMESTAMP_ERROR)
@@ -9614,11 +9614,29 @@ int Item_cache_temporal::save_in_field(Field *field, bool no_conversions)
 
 void Item_cache_temporal::store_packed(longlong val_arg, Item *example_arg)
 {
-  /* An explicit values is given, save it. */
+  /* An explicit value is given, save it. */
   store(example_arg);
   value_cached= true;
   value= val_arg;
   null_value= false;
+
+  switch (example_arg->type())
+  {
+    case FUNC_ITEM:
+    {
+      // Instead of "cache", use the actual function name,
+      // which is more meaningful to the end user
+      const char *func_name     = ( ( Item_func* ) example_arg )->func_name();
+      char       *ptr           = ( char* ) current_thd->alloc( strlen( func_name ) + 3 );
+
+      if ( ptr )
+      {
+        strxmov( ptr, func_name, "()", NullS );
+      }
+
+      cached_temporal_item_name = ptr;
+    }
+  }
 }
 
 

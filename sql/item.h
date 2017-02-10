@@ -5436,6 +5436,7 @@ public:
 
   static Item_cache* get_cache(THD *thd, const Item *item);
   static Item_cache* get_cache(THD *thd, const Item* item, const Item_result type);
+  virtual const char* cached_item_name() const { return "cache"; }
   virtual void keep_array() {}
   virtual void print(String *str, enum_query_type query_type);
   bool eq_def(const Field *field) 
@@ -5448,7 +5449,7 @@ public:
   }
   bool check_vcol_func_processor(void *arg) 
   {
-    return mark_unsupported_function("cache", arg, VCOL_IMPOSSIBLE);
+    return mark_unsupported_function(cached_item_name(), arg, VCOL_IMPOSSIBLE);
   }
   /**
      Check if saved item has a non-NULL value.
@@ -5529,6 +5530,7 @@ public:
 
 class Item_cache_temporal: public Item_cache_int
 {
+  const char *cached_temporal_item_name;
 public:
   Item_cache_temporal(THD *thd, enum_field_types field_type_arg);
   String* val_str(String *str);
@@ -5551,6 +5553,8 @@ public:
   Item *convert_to_basic_const_item(THD *thd);
   Item *get_copy(THD *thd, MEM_ROOT *mem_root)
   { return get_item_copy<Item_cache_temporal>(thd, mem_root, this); }
+  const char *cached_item_name() const
+  { return cached_temporal_item_name ? cached_temporal_item_name : "cache"; }
 };
 
 

@@ -48,7 +48,7 @@
 #define MYSQL57_GCOL_HEADER_SIZE 4
 
 static Virtual_column_info * unpack_vcol_info_from_frm(THD *, MEM_ROOT *,
-              TABLE *, String *, Virtual_column_info **, bool *);
+              TABLE *, String *, Virtual_column_info **, uint, bool *);
 static bool check_vcol_forward_refs(Field *, Virtual_column_info *);
 
 /* INFORMATION_SCHEMA name */
@@ -1065,24 +1065,24 @@ bool parse_vcol_defs(THD *thd, MEM_ROOT *mem_root, TABLE *table,
     case VCOL_GENERATED_VIRTUAL:
     case VCOL_GENERATED_STORED:
       vcol= unpack_vcol_info_from_frm(thd, mem_root, table, &expr_str,
-                                    &((*field_ptr)->vcol_info), error_reported);
+                                    &((*field_ptr)->vcol_info), type, error_reported);
       *(vfield_ptr++)= *field_ptr;
       break;
     case VCOL_DEFAULT:
       vcol= unpack_vcol_info_from_frm(thd, mem_root, table, &expr_str,
                                       &((*field_ptr)->default_value),
-                                      error_reported);
+                                      type, error_reported);
       *(dfield_ptr++)= *field_ptr;
       break;
     case VCOL_CHECK_FIELD:
       vcol= unpack_vcol_info_from_frm(thd, mem_root, table, &expr_str,
                                       &((*field_ptr)->check_constraint),
-                                      error_reported);
+                                      type, error_reported);
       *check_constraint_ptr++= (*field_ptr)->check_constraint;
       break;
     case VCOL_CHECK_TABLE:
       vcol= unpack_vcol_info_from_frm(thd, mem_root, table, &expr_str,
-                                      check_constraint_ptr, error_reported);
+                                      check_constraint_ptr, type, error_reported);
       check_constraint_ptr++;
       break;
     }
@@ -1103,7 +1103,7 @@ bool parse_vcol_defs(THD *thd, MEM_ROOT *mem_root, TABLE *table,
       expr_str.append(')');
       vcol= unpack_vcol_info_from_frm(thd, mem_root, table, &expr_str,
                                       &((*field_ptr)->default_value),
-                                      error_reported);
+                                      VCOL_DEFAULT, error_reported);
       *(dfield_ptr++)= *field_ptr;
       if (!field->default_value->expr)
         goto end;
@@ -2774,7 +2774,7 @@ bool fix_session_vcol_expr_for_read(THD *thd, Field *field,
 */
 
 static bool fix_and_check_vcol_expr(THD *thd, TABLE *table,
-                                    Virtual_column_info *vcol)
+                                    Virtual_column_info *vcol, uint vcol_type)
 {
   Item* func_expr= vcol->expr;
   DBUG_ENTER("fix_and_check_vcol_expr");
@@ -2809,9 +2809,14 @@ static bool fix_and_check_vcol_expr(THD *thd, TABLE *table,
 
   int error= func_expr->walk(&Item::check_vcol_func_processor, 0, &res);
   if (error || (res.errors & VCOL_IMPOSSIBLE))
-  { // this can only happen if the frm was corrupted
+  {
+    // This can legitimately occur if the column is virtual or has a
+    // default value that is cached.  When the statement is originally
+    // parsed, the parser needs to allow cached values in order to
+    // handle CREATE with a SELECT, so the parser would not have
+    // encountered this error.
     my_error(ER_VIRTUAL_COLUMN_FUNCTION_IS_NOT_ALLOWED, MYF(0), res.name,
-             "???", "?????");
+             vcol_type_name((enum_vcol_info_type) vcol_type), vcol->name.str);
     DBUG_RETURN(1);
   }
   vcol->flags= res.errors;
@@ -2864,7 +2869,7 @@ static bool fix_and_check_vcol_expr(THD *thd, TABLE *table,
 static Virtual_column_info *
 unpack_vcol_info_from_frm(THD *thd, MEM_ROOT *mem_root, TABLE *table,
                           String *expr_str, Virtual_column_info **vcol_ptr,
-                          bool *error_reported)
+                          uint vcol_type, bool *error_reported)
 {
   Create_field vcol_storage; // placeholder for vcol_info
   Parser_state parser_state;
@@ -2892,7 +2897,7 @@ unpack_vcol_info_from_frm(THD *thd, MEM_ROOT *mem_root, TABLE *table,
   vcol_storage.vcol_info->stored_in_db=      vcol->stored_in_db;
   vcol_storage.vcol_info->name=              vcol->name;
   vcol_storage.vcol_info->utf8=              vcol->utf8;
-  if (!fix_and_check_vcol_expr(thd, table, vcol_storage.vcol_info))
+  if (!fix_and_check_vcol_expr(thd, table, vcol_storage.vcol_info, vcol_type))
   {
     *vcol_ptr= vcol_info= vcol_storage.vcol_info;   // Expression ok
     DBUG_ASSERT(vcol_info->expr);
