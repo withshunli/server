@@ -1,0 +1,61 @@
+--source include/have_innodb.inc
+--source include/windows.inc
+--disable_query_log
+let $innodb_file_per_table_orig = `SELECT @@innodb_file_per_table`;
+let $MYSQLD_DATADIR = `SELECT @@datadir`;
+let DATADIR=$MYSQLD_DATADIR;
+--enable_query_log
+
+--disable_warnings
+SET GLOBAL innodb_file_per_table = default;
+--enable_warnings
+
+CREATE TABLE compressed(i int) ENGINE=InnoDB file_compressed=YES;
+SHOW CREATE TABLE compressed;
+
+CREATE TABLE uncompressed(i int) ENGINE=InnoDB;
+
+perl;
+use Win32::File qw[ GetAttributes ];
+
+sub is_compressed
+{
+  my ($file) = @_;
+  my $attrs;
+  if (!Win32::File::GetAttributes($file, $attrs))
+  {
+     print "ERROR : Win32::File::GetAttributes failed for $file\n";
+  }
+  return $attrs & Win32::File::COMPRESSED();
+}
+
+
+my $datadir = $ENV{'DATADIR'};
+my $compressed_ibd = $datadir.'/test/compressed.ibd';
+my $uncompressed_ibd = $datadir.'/test/uncompressed.ibd';
+
+if (!is_compressed($compressed_ibd))
+{
+   print "ERROR : compressed.ibd is NOT compressed on file system level\n";
+}
+
+if (!is_compressed($datadir) && is_compressed($uncompressed_ibd))
+{
+  print "ERROR : uncompressed.ibd is compressed on file system level\n";
+}
+
+if (!is_compressed($datadir) && is_compressed($uncompressed_ibd))
+{
+  print "ERROR : uncompressed.ibd is compressed on file system level\n";
+}
+
+EOF
+
+DROP TABLE compressed;
+DROP TABLE uncompressed;
+# reset system
+--disable_query_log
+--disable_warnings
+EVAL SET GLOBAL innodb_file_per_table = $innodb_file_per_table_orig;
+--enable_warnings
+--enable_query_log

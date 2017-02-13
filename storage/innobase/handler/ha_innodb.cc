@@ -693,9 +693,17 @@ ha_create_table_option innodb_table_option_list[]=
   HA_TOPTION_ENUM("ENCRYPTED", encryption, "DEFAULT,YES,NO", 0),
   /* With this option the user defines the key identifier using for the encryption */
   HA_TOPTION_SYSVAR("ENCRYPTION_KEY_ID", encryption_key_id, default_encryption_key_id),
-
+  HA_TOPTION_ENUM("FILE_COMPRESSED",file_compressed,"DEFAULT,YES,NO", 0),
   HA_TOPTION_END
 };
+
+/* Translate ha_table_option_struct into dict_table_options */
+void make_dict_table_options(const ha_table_option_struct *ha_opts, dict_table_options_t *opts) {
+	ut_a(ha_opts);
+	opts->file_compression = (fil_file_compression_t)ha_opts->file_compressed;
+	opts->encryption = (fil_encryption_t)ha_opts->encryption;
+	opts->encryption_key_id = (uint)ha_opts->encryption_key_id;
+}
 
 /*************************************************************//**
 Check whether valid argument given to innodb_ft_*_stopword_table.
@@ -11863,9 +11871,7 @@ err_col:
 		if (err == DB_SUCCESS) {
 			err = row_create_table_for_mysql(
 				table, m_trx, false,
-				(fil_encryption_t)options->encryption,
-				(ulint)options->encryption_key_id);
-
+				&m_opts);
 		}
 
 		DBUG_EXECUTE_IF("ib_crash_during_create_for_encryption",
@@ -11910,7 +11916,8 @@ create_index(
 					columns and indexes */
 	ulint		flags,		/*!< in: InnoDB table flags */
 	const char*	table_name,	/*!< in: table name */
-	uint		key_num)	/*!< in: index number */
+	uint		key_num, /*!< in: index number */
+	dict_table_options_t *opts) /*!< in: table options, compression/encryption*/
 {
 	dict_index_t*	index;
 	int		error;
@@ -11954,7 +11961,7 @@ create_index(
 
 		DBUG_RETURN(convert_error_code_to_mysql(
 				    row_create_index_for_mysql(
-					    index, trx, NULL),
+					    index, trx, NULL, opts),
 				    flags, NULL));
 
 	}
@@ -12356,6 +12363,7 @@ create_table_info_t::check_table_options()
 		}
 	}
 
+
 	if (encrypt != FIL_SPACE_ENCRYPTION_DEFAULT && !m_allow_file_per_table) {
 		push_warning(
 			m_thd, Sql_condition::WARN_LEVEL_WARN,
@@ -12363,6 +12371,15 @@ create_table_info_t::check_table_options()
 			"InnoDB: ENCRYPTED requires innodb_file_per_table");
 		return "ENCRYPTED";
  	}
+
+	fil_file_compression_t file_compress = (fil_file_compression_t)options->file_compressed;
+	if (file_compress != FIL_FILE_COMPRESSION_DEFAULT && !m_allow_file_per_table) {
+		push_warning(
+			m_thd, Sql_condition::WARN_LEVEL_WARN,
+			HA_WRONG_CREATE_OPTION,
+			"InnoDB: FILE_COMPRESSED requires innodb_file_per_table");
+		return "FILE_COMPRESSED";
+	}
 
 	if (encrypt == FIL_SPACE_ENCRYPTION_OFF && srv_encrypt_tables == 2) {
 		push_warning(
@@ -13195,7 +13212,7 @@ create_table_info_t::create_table()
 		/* In InnoDB the clustered index must always be created
 		first */
 		if ((error = create_index(m_trx, m_form, m_flags, m_table_name,
-					  (uint) primary_key_no))) {
+					  (uint) primary_key_no,&m_opts))) {
 			DBUG_RETURN(error);
 		}
 	}
@@ -13246,7 +13263,7 @@ create_table_info_t::create_table()
 
 		dberr_t	err = fts_create_common_tables(
 			m_trx, innobase_table, m_table_name,
-			(ret == FTS_EXIST_DOC_ID_INDEX));
+			(ret == FTS_EXIST_DOC_ID_INDEX), &m_opts);
 
 		error = convert_error_code_to_mysql(err, 0, NULL);
 
@@ -13268,7 +13285,7 @@ create_table_info_t::create_table()
 		if (i != static_cast<uint>(primary_key_no)) {
 
 			if ((error = create_index(m_trx, m_form, m_flags,
-						  m_table_name, i))) {
+						  m_table_name, i, &m_opts))) {
 				DBUG_RETURN(error);
 			}
 		}

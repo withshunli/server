@@ -1,0 +1,10 @@
+SET GLOBAL innodb_file_per_table = default;
+CREATE TABLE compressed(i int) ENGINE=InnoDB file_compressed=YES;
+SHOW CREATE TABLE compressed;
+Table	Create Table
+compressed	CREATE TABLE `compressed` (
+  `i` int(11) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 `file_compressed`=YES
+CREATE TABLE uncompressed(i int) ENGINE=InnoDB;
+DROP TABLE compressed;
+DROP TABLE uncompressed;

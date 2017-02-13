@@ -22,6 +22,8 @@ this program; if not, write to the Free Software Foundation, Inc.,
 /** "GEN_CLUST_INDEX" is the name reserved for InnoDB default
 system clustered index when there is no primary key. */
 extern const char innobase_index_reserve_name[];
+struct dict_table_options_t;
+extern void make_dict_table_options(const ha_table_option_struct *ha_opts, dict_table_options_t *opts);
 
 /* Structure defines translation table between mysql index and InnoDB
 index structures */
@@ -60,6 +62,7 @@ struct ha_table_option_struct
 {
 	bool		page_compressed;	/*!< Table is using page compression
 						if this option is true. */
+	uint		file_compressed; /* !< DEFAULT, ON, OFF */
 	ulonglong	page_compression_level;	/*!< Table page compression level
 						0-9. */
 	uint		atomic_writes;		/*!< Use atomic writes for this
@@ -695,7 +698,9 @@ public:
 	m_table_name(table_name),
 	m_remote_path(remote_path),
 	m_innodb_file_per_table(srv_file_per_table)
-	{}
+	{
+		make_dict_table_options(create_info->option_struct, &m_opts);
+	}
 
 	/** Initialize the object. */
 	int initialize();
@@ -827,6 +832,9 @@ private:
 
 	/** Table flags2 */
 	ulint		m_flags2;
+
+	/** Create table options, e.g encryption */
+	dict_table_options_t m_opts;
 };
 
 /**

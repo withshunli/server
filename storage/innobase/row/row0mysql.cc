@@ -2423,8 +2423,7 @@ row_create_table_for_mysql(
 				added to the data dictionary cache) */
 	trx_t*		trx,	/*!< in/out: transaction */
 	bool		commit,	/*!< in: if true, commit the transaction */
-	fil_encryption_t mode,	/*!< in: encryption mode */
-	ulint		key_id)	/*!< in: encryption key_id */
+	const dict_table_options_t *opts)
 {
 	tab_node_t*	node;
 	mem_heap_t*	heap;
@@ -2477,7 +2476,7 @@ err_exit:
 		ut_ad(strstr(table->name.m_name, "/FTS_") != NULL);
 	}
 
-	node = tab_create_graph_create(table, heap, mode, key_id);
+	node = tab_create_graph_create(table, heap, opts);
 
 	thr = pars_complete_graph_for_exec(node, trx, heap, NULL);
 
@@ -2579,12 +2578,13 @@ row_create_index_for_mysql(
 	dict_index_t*	index,		/*!< in, own: index definition
 					(will be freed) */
 	trx_t*		trx,		/*!< in: transaction handle */
-	const ulint*	field_lengths)	/*!< in: if not NULL, must contain
+	const ulint*	field_lengths,	/*!< in: if not NULL, must contain
 					dict_index_get_n_fields(index)
 					actual field lengths for the
 					index columns, which are
 					then checked for not being too
 					large. */
+	const dict_table_options_t*	opts)	/*!< in: table opts, FTS only */
 {
 	ind_node_t*	node;
 	mem_heap_t*	heap;
@@ -2698,8 +2698,9 @@ row_create_index_for_mysql(
 		idx = dict_table_get_index_on_name(table, index_name);
 
 		ut_ad(idx);
+		ut_a(opts);
 		err = fts_create_index_tables_low(
-			trx, idx, table->name.m_name, table->id);
+			trx, idx, table->name.m_name, table->id, opts);
 	}
 
 error_handling:

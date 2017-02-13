@@ -514,7 +514,8 @@ fts_create_common_tables(
 			table,			/*!< in: table with one FTS
 						index */
 	const char*	name,			/*!< in: table name */
-	bool		skip_doc_id_index)	/*!< in: Skip index on doc id */
+	bool		skip_doc_id_index,	/*!< in: Skip index on doc id */
+	const dict_table_options_t*	opts) /*!< in options(compression,encryption) */
 	MY_ATTRIBUTE((warn_unused_result));
 /******************************************************************//**
 Wrapper function of fts_create_index_tables_low(), create auxiliary
@@ -524,8 +525,8 @@ dberr_t
 fts_create_index_tables(
 /*====================*/
 	trx_t*			trx,		/*!< in: transaction handle */
-	const dict_index_t*	index)		/*!< in: the FTS index
-						instance */
+	const dict_index_t*	index,		/*!< in: the FTS index instance */
+	const dict_table_options_t*	opts) /*!< in options(compression,encryption) */
 	MY_ATTRIBUTE((warn_unused_result));
 /******************************************************************//**
 Creates the column specific ancillary tables needed for supporting an
@@ -540,7 +541,8 @@ fts_create_index_tables_low(
 			index,			/*!< in: the FTS index
 						instance */
 	const char*	table_name,		/*!< in: the table name */
-	table_id_t	table_id)		/*!< in: the table id */
+	table_id_t	table_id,		/*!< in: the table id */
+	const dict_table_options_t*	opts)	/*!< in options(compression,encryption) */
 	MY_ATTRIBUTE((warn_unused_result));
 /******************************************************************//**
 Add the FTS document id hidden column. */

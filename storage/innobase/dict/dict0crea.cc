@@ -449,11 +449,15 @@ dict_build_tablespace_for_table(
 		- page 3 will contain the root of the clustered index of
 		the table we create here. */
 
+		dict_table_options_t opts;
+		if (node) {
+			opts = node->dict_table_options;
+		}
+
 		err = fil_ibd_create(
 			space, table->name.m_name, filepath, fsp_flags,
 			FIL_IBD_FILE_INITIAL_SIZE,
-			node ? node->mode : FIL_SPACE_ENCRYPTION_DEFAULT,
-			node ? node->key_id : FIL_DEFAULT_ENCRYPTION_KEY);
+			&opts);
 
 		ut_free(filepath);
 
@@ -1255,8 +1259,7 @@ tab_create_graph_create(
 	dict_table_t*	table,	/*!< in: table to create, built as a memory data
 				structure */
 	mem_heap_t*	heap,	/*!< in: heap where created */
-	fil_encryption_t mode,	/*!< in: encryption mode */
-	ulint		key_id)	/*!< in: encryption key_id */
+	const dict_table_options_t *dict_table_options) /*!< in: options (e.g compress,encrypt) */
 {
 	tab_node_t*	node;
 
@@ -1269,9 +1272,7 @@ tab_create_graph_create(
 
 	node->state = TABLE_BUILD_TABLE_DEF;
 	node->heap = mem_heap_create(256);
-	node->mode = mode;
-	node->key_id = key_id;
-
+	node->dict_table_options = *dict_table_options;
 	node->tab_def = ins_node_create(INS_DIRECT, dict_sys->sys_tables,
 					heap);
 	node->tab_def->common.parent = node;

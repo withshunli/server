@@ -124,4 +124,32 @@ enum spatial_status_t {
 	SPATIAL_ONLY	= 3
 };
 
+
+/** Enum values for encryption table option */
+typedef enum {
+  FIL_SPACE_ENCRYPTION_DEFAULT = 0,	/* Tablespace encrypted if
+                                    srv_encrypt_tables = ON */
+  FIL_SPACE_ENCRYPTION_ON = 1,		/* Tablespace is encrypted always */
+  FIL_SPACE_ENCRYPTION_OFF = 2		/* Tablespace is not encrypted */
+} fil_encryption_t;
+
+enum fil_file_compression_t {
+  FIL_FILE_COMPRESSION_DEFAULT = 0,	/* Tablespace may be compressed if parent folder is compressed */
+  FIL_FILE_COMPRESSION_ON = 1,		/* Tablespace is always compressed*/
+  FIL_FILE_COMPRESSION_OFF = 2		/* Tablespace is not compressed. */
+};
+
+
+struct dict_table_options_t {
+  fil_file_compression_t file_compression;
+  fil_encryption_t encryption;
+  unsigned int encryption_key_id;
+
+  dict_table_options_t():
+    file_compression(FIL_FILE_COMPRESSION_DEFAULT),
+    encryption(FIL_SPACE_ENCRYPTION_DEFAULT),
+    encryption_key_id(1)
+  {}
+};
+
 #endif

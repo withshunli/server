@@ -605,6 +605,13 @@ ha_innobase::check_if_supported_inplace_alter(
 			DBUG_RETURN(HA_ALTER_INPLACE_NOT_SUPPORTED);
 		}
 
+		if (new_options->file_compressed != old_options->file_compressed) {
+			//Should we support online file compression?
+			ha_alter_info->unsupported_reason = innobase_get_err_msg(
+				ER_ALTER_OPERATION_NOT_SUPPORTED_REASON);
+			DBUG_RETURN(HA_ALTER_INPLACE_NOT_SUPPORTED);
+		}
+
 		if (new_options->encryption != old_options->encryption ||
 			new_options->encryption_key_id != old_options->encryption_key_id) {
 			ha_alter_info->unsupported_reason = innobase_get_err_msg(
@@ -4361,11 +4368,16 @@ prepare_inplace_alter_table_dict(
 	ulint			num_fts_index;
 	dict_add_v_col_t*	add_v = NULL;
 	ha_innobase_inplace_ctx*ctx;
+	dict_table_options_t opts;
 
 	DBUG_ENTER("prepare_inplace_alter_table_dict");
 
 	ctx = static_cast<ha_innobase_inplace_ctx*>
 		(ha_alter_info->handler_ctx);
+
+	if (ha_alter_info && ha_alter_info->create_info && ha_alter_info->create_info->option_struct) {
+		make_dict_table_options(ha_alter_info->create_info->option_struct, &opts);
+	}
 
 	DBUG_ASSERT((ctx->add_autoinc != ULINT_UNDEFINED)
 		    == (ctx->sequence.m_max_value > 0));
@@ -4716,8 +4728,12 @@ prepare_inplace_alter_table_dict(
 			ctx->new_table->fts->doc_col = fts_doc_id_col;
 		}
 
+		if (ha_alter_info && ha_alter_info->create_info && ha_alter_info->create_info->option_struct) {
+			make_dict_table_options(ha_alter_info->create_info->option_struct, &opts);
+		}
+
 		error = row_create_table_for_mysql(
-			ctx->new_table, ctx->trx, false, mode, key_id);
+			ctx->new_table, ctx->trx, false, &opts);
 
 		switch (error) {
 			dict_table_t*	temp_table;
@@ -4985,7 +5001,7 @@ op_ok:
 		/* This function will commit the transaction and reset
 		the trx_t::dict_operation flag on success. */
 
-		error = fts_create_index_tables(ctx->trx, fts_index);
+		error = fts_create_index_tables(ctx->trx, fts_index, &opts);
 
 		DBUG_EXECUTE_IF("innodb_test_fail_after_fts_index_table",
 				error = DB_LOCK_WAIT_TIMEOUT;
@@ -5001,7 +5017,7 @@ op_ok:
 		    || ib_vector_size(ctx->new_table->fts->indexes) == 0) {
 			error = fts_create_common_tables(
 				ctx->trx, ctx->new_table,
-				user_table->name.m_name, TRUE);
+				user_table->name.m_name, TRUE, &opts);
 
 			DBUG_EXECUTE_IF(
 				"innodb_test_fail_after_fts_common_table",

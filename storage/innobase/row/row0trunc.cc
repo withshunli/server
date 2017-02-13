@@ -1317,9 +1317,9 @@ row_truncate_fts(
 	fts_table.data_dir_path = table->data_dir_path;
 
 	dberr_t		err;
-
+	dict_table_options_t opts;
 	err = fts_create_common_tables(
-		trx, &fts_table, table->name.m_name, TRUE);
+		trx, &fts_table, table->name.m_name, TRUE, &opts);
 
 	for (ulint i = 0;
 	     i < ib_vector_size(table->fts->indexes) && err == DB_SUCCESS;
@@ -1331,7 +1331,7 @@ row_truncate_fts(
 			ib_vector_getp(table->fts->indexes, i));
 
 		err = fts_create_index_tables_low(
-			trx, fts_index, table->name.m_name, new_id);
+			trx, fts_index, table->name.m_name, new_id, &opts);
 	}
 
 	DBUG_EXECUTE_IF("ib_err_trunc_during_fts_trunc",
@@ -2190,8 +2190,7 @@ truncate_t::fixup_tables_in_non_system_tablespace()
 				(*it)->m_dir_path,
 				(*it)->m_tablespace_flags,
 				FIL_IBD_FILE_INITIAL_SIZE,
-				(*it)->m_encryption,
-				(*it)->m_key_id);
+				&(*it)->m_dict_table_options);
 
 			if (err != DB_SUCCESS) {
 				/* If checkpoint is not yet done
@@ -2270,8 +2269,7 @@ truncate_t::truncate_t(
 	m_log_lsn(),
 	m_log_file_name(),
 	/* JAN: TODO: Encryption */
-	m_encryption(FIL_SPACE_ENCRYPTION_DEFAULT),
-	m_key_id(FIL_DEFAULT_ENCRYPTION_KEY)
+	m_dict_table_options()
 {
 	if (dir_path != NULL) {
 		m_dir_path = mem_strdup(dir_path);
@@ -2297,9 +2295,7 @@ truncate_t::truncate_t(
 	m_log_lsn(),
 	m_log_file_name(),
 	/* JAN: TODO: Encryption */
-	m_encryption(FIL_SPACE_ENCRYPTION_DEFAULT),
-	m_key_id(FIL_DEFAULT_ENCRYPTION_KEY)
-
+	m_dict_table_options()
 {
 	m_log_file_name = mem_strdup(log_file_name);
 	if (m_log_file_name == NULL) {

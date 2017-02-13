@@ -1795,6 +1795,7 @@ fts_create_in_mem_aux_table(
 @param[in]	fts_table_name	FTS AUX table name
 @param[in]	fts_suffix	FTS AUX table suffix
 @param[in]	heap		heap
+@param[in]	opts		setting for encryption and compression
 @return table object if created, else NULL */
 static
 dict_table_t*
@@ -1803,7 +1804,8 @@ fts_create_one_common_table(
 	const dict_table_t*	table,
 	const char*		fts_table_name,
 	const char*		fts_suffix,
-	mem_heap_t*		heap)
+	mem_heap_t*		heap,
+	const dict_table_options_t*	opts)
 {
 	dict_table_t*		new_table = NULL;
 	dberr_t			error;
@@ -1831,8 +1833,7 @@ fts_create_one_common_table(
 			FTS_CONFIG_TABLE_VALUE_COL_LEN);
 	}
 
-	error = row_create_table_for_mysql(new_table, trx, false,
-		FIL_SPACE_ENCRYPTION_DEFAULT, FIL_DEFAULT_ENCRYPTION_KEY);
+	error = row_create_table_for_mysql(new_table, trx, false, opts);
 
 	if (error == DB_SUCCESS) {
 
@@ -1851,7 +1852,7 @@ fts_create_one_common_table(
 		TRX_DICT_OP_TABLE. */
 		trx_dict_op_t op = trx_get_dict_operation(trx);
 
-		error =	row_create_index_for_mysql(index, trx, NULL);
+		error = row_create_index_for_mysql(index, trx, NULL, opts);
 
 		trx->dict_operation = op;
 	}
@@ -1884,13 +1885,15 @@ CREATE TABLE $FTS_PREFIX_CONFIG
 @param[in]	table			table with FTS index
 @param[in]	name			table name normalized
 @param[in]	skip_doc_id_index	Skip index on doc id
+@param[in]	opts			create table options(e.g encryption)
 @return DB_SUCCESS if succeed */
 dberr_t
 fts_create_common_tables(
 	trx_t*			trx,
 	const dict_table_t*	table,
 	const char*		name,
-	bool			skip_doc_id_index)
+	bool			skip_doc_id_index,
+	const dict_table_options_t*	opts)
 {
 	dberr_t		error;
 	que_t*		graph;
@@ -1923,7 +1926,7 @@ fts_create_common_tables(
 		fts_table.suffix = fts_common_tables[i];
 		fts_get_table_name(&fts_table, full_name[i]);
 		dict_table_t*	common_table = fts_create_one_common_table(
-			trx, table, full_name[i], fts_table.suffix, heap);
+			trx, table, full_name[i], fts_table.suffix, heap, opts);
 
 		 if (common_table == NULL) {
 			error = DB_ERROR;
@@ -1968,7 +1971,7 @@ fts_create_common_tables(
 
 	op = trx_get_dict_operation(trx);
 
-	error =	row_create_index_for_mysql(index, trx, NULL);
+	error =	row_create_index_for_mysql(index, trx, NULL, opts);
 
 	trx->dict_operation = op;
 
@@ -1992,6 +1995,7 @@ func_exit:
 @param[in]	index		the index instance
 @param[in]	fts_table	fts_table structure
 @param[in,out]	heap		memory heap
+@param[in]	opts		Create table options (encryption etc)
 @see row_merge_create_fts_sort_index()
 @return DB_SUCCESS or error code */
 static
@@ -2000,7 +2004,8 @@ fts_create_one_index_table(
 	trx_t*			trx,
 	const dict_index_t*	index,
 	const fts_table_t*	fts_table,
-	mem_heap_t*		heap)
+	mem_heap_t*		heap,
+	const dict_table_options_t *opts)
 {
 	dict_field_t*		field;
 	dict_table_t*		new_table = NULL;
@@ -2048,8 +2053,7 @@ fts_create_one_index_table(
 		(DATA_MTYPE_MAX << 16) | DATA_UNSIGNED | DATA_NOT_NULL,
 		FTS_INDEX_ILIST_LEN);
 
-	error = row_create_table_for_mysql(new_table, trx, false,
-		FIL_SPACE_ENCRYPTION_DEFAULT, FIL_DEFAULT_ENCRYPTION_KEY);
+	error = row_create_table_for_mysql(new_table, trx, false, opts);
 
 	if (error == DB_SUCCESS) {
 		dict_index_t*	index = dict_mem_index_create(
@@ -2060,7 +2064,7 @@ fts_create_one_index_table(
 
 		trx_dict_op_t op = trx_get_dict_operation(trx);
 
-		error =	row_create_index_for_mysql(index, trx, NULL);
+		error =	row_create_index_for_mysql(index, trx, NULL,opts);
 
 		trx->dict_operation = op;
 	}
@@ -2081,13 +2085,15 @@ fts_create_one_index_table(
 @param[in]	index		the index instance
 @param[in]	table_name	table name
 @param[in]	table_id	the table id
+@param[in]  opts  misc. options (compression,encryption)
 @return DB_SUCCESS or error code */
 dberr_t
 fts_create_index_tables_low(
 	trx_t*			trx,
 	const dict_index_t*	index,
 	const char*		table_name,
-	table_id_t		table_id)
+	table_id_t		table_id,
+	const dict_table_options_t*	opts)
 {
 	ulint		i;
 	fts_table_t	fts_table;
@@ -2131,7 +2137,7 @@ fts_create_index_tables_low(
 		fts_table.suffix = fts_get_suffix(i);
 
 		new_table = fts_create_one_index_table(
-			trx, index, &fts_table, heap);
+			trx, index, &fts_table, heap, opts);
 
 		if (new_table == NULL) {
 			error = DB_FAIL;
@@ -2179,11 +2185,13 @@ CREAT TABLE $FTS_PREFIX_INDEX_[1-6](
 	UNIQUE CLUSTERED INDEX ON (word, first_doc_id))
 @param[in,out]	trx	transaction
 @param[in]	index	index instance
+@param[in]	opts	Create table options (e.g encryption)
 @return DB_SUCCESS or error code */
 dberr_t
 fts_create_index_tables(
 	trx_t*			trx,
-	const dict_index_t*	index)
+	const dict_index_t*	index,
+	const dict_table_options_t*	opts)
 {
 	dberr_t		err;
 	dict_table_t*	table;
@@ -2192,7 +2200,7 @@ fts_create_index_tables(
 	ut_a(table != NULL);
 
 	err = fts_create_index_tables_low(
-		trx, index, table->name.m_name, table->id);
+		trx, index, table->name.m_name, table->id, opts);
 
 	if (err == DB_SUCCESS) {
 		trx_commit(trx);

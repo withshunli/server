@@ -974,8 +974,7 @@ fil_ibd_create(
 	const char*	path,
 	ulint		flags,
 	ulint		size,
-	fil_encryption_t mode,
-	ulint		key_id)
+	const dict_table_options_t *opts)
 	MY_ATTRIBUTE((warn_unused_result));
 
 /** Try to adjust FSP_SPACE_FLAGS if they differ from the expectations.

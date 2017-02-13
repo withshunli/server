@@ -27,6 +27,7 @@ Created 04/01/2015 Jan Lindström
 #define fil0crypt_h
 
 #include "os0event.h"
+#include "dict0types.h"
 
 /**
 * Magic pattern in start of crypt data on page 0
@@ -38,14 +39,6 @@ static const unsigned char CRYPT_MAGIC[MAGIC_SZ] = {
 
 /* This key will be used if nothing else is given */
 #define FIL_DEFAULT_ENCRYPTION_KEY ENCRYPTION_KEY_SYSTEM_DATA
-
-/** Enum values for encryption table option */
-typedef enum {
-	FIL_SPACE_ENCRYPTION_DEFAULT = 0,	/* Tablespace encrypted if
-						srv_encrypt_tables = ON */
-	FIL_SPACE_ENCRYPTION_ON = 1,		/* Tablespace is encrypted always */
-	FIL_SPACE_ENCRYPTION_OFF = 2		/* Tablespace is not encrypted */
-} fil_encryption_t;
 
 extern os_event_t fil_crypt_threads_event;
 

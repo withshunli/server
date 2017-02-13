@@ -1568,6 +1568,22 @@ os_file_punch_hole(
 	os_offset_t	len)
 	MY_ATTRIBUTE((warn_unused_result));
 
+/** Can given file be transparently compressed?
+@param[in] file  Open file handle
+@return true if file can be compressed.
+*/
+UNIV_INTERN bool os_file_supports_compression(
+	os_file_t file);
+
+/** Set compression state for file transparent compression
+@param[in] file  Open file handle
+@param[in] compress  true to make file compressed, false to make it uncompressed.
+@return true on success, false on error.
+*/
+UNIV_INTERN dberr_t os_file_set_compression_state(
+	os_file_t file,
+	bool compress);
+
 /** Normalizes a directory path for the current OS:
 On Windows, we convert '/' to '\', else we convert '\' to '/'.
 @param[in,out] str A null-terminated directory and file path */

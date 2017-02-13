@@ -3652,8 +3652,7 @@ func_exit:
 @param[in]	flags		Tablespace flags
 @param[in]	size		Initial size of the tablespace file in
                                 pages, must be >= FIL_IBD_FILE_INITIAL_SIZE
-@param[in]	mode		MariaDB encryption mode
-@param[in]	key_id		MariaDB encryption key_id
+@param[in]	opts		Other table options (file encryption, compression)
 @return DB_SUCCESS or error code */
 dberr_t
 fil_ibd_create(
@@ -3662,8 +3661,7 @@ fil_ibd_create(
 	const char*	path,
 	ulint		flags,
 	ulint		size,
-	fil_encryption_t mode,
-	ulint		key_id)
+	const dict_table_options_t *opts)
 {
 	os_file_t	file;
 	dberr_t		err;
@@ -3679,6 +3677,7 @@ fil_ibd_create(
 	ut_a(space_id < SRV_LOG_SPACE_FIRST_ID);
 	ut_a(size >= FIL_IBD_FILE_INITIAL_SIZE);
 	ut_a(fsp_flags_is_valid(flags & ~FSP_FLAGS_MEM_MASK));
+	ut_a(opts);
 
 	/* Create the subdirectories in the path, if they are
 	not there already. */
@@ -3725,6 +3724,22 @@ fil_ibd_create(
 		return(DB_ERROR);
 	}
 
+	if (opts->file_compression != FIL_FILE_COMPRESSION_DEFAULT) {
+
+		dberr_t err = os_file_set_compression_state(file,
+			opts->file_compression == FIL_FILE_COMPRESSION_ON ? true : false);
+
+		if (err != DB_SUCCESS) {
+			if (err == DB_UNSUPPORTED) {
+				ib::warn() << " Transparent file compression attribute ignored for " << path
+					<< " not supported on this platform";
+			}
+			else {
+				ib::warn() << "Failed to set compression attribute on file " << path
+					<< " error " << err << ", last error " << os_file_get_last_error(true);
+			}
+		}
+	}
         success= false;
 #ifdef HAVE_POSIX_FALLOCATE
         /*
@@ -3870,9 +3885,9 @@ fil_ibd_create(
 
 	/* Create crypt data if the tablespace is either encrypted or user has
 	requested it to remain unencrypted. */
-	if (mode == FIL_SPACE_ENCRYPTION_ON || mode == FIL_SPACE_ENCRYPTION_OFF ||
+	if (opts->encryption == FIL_SPACE_ENCRYPTION_ON || opts->encryption == FIL_SPACE_ENCRYPTION_OFF ||
 		srv_encrypt_tables) {
-		crypt_data = fil_space_create_crypt_data(mode, key_id);
+		crypt_data = fil_space_create_crypt_data(opts->encryption, opts->encryption_key_id);
 	}
 
 	space = fil_space_create(name, space_id, flags, FIL_TYPE_TABLESPACE,
