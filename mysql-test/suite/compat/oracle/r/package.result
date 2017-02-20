@@ -183,3 +183,78 @@ ERROR 42000: You have an error in your SQL syntax; check the manual that corresp
 # So dropping a body which was already dropped before returns no errors.
 DROP PACKAGE BODY test2;
 DROP PACKAGE test2;
+#
+# CREATA PACKAGE: Optional package name after the "END" keyword
+#
+CREATE PACKAGE test2 AS
+FUNCTION f1 RETURN INT;
+PROCEDURE p1;
+END test2.test2
+$$
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near '.test2' at line 3
+CREATE PACKAGE test2 AS
+FUNCTION f1 RETURN INT;
+PROCEDURE p1;
+END test3
+$$
+ERROR HY000: END identifier 'test3' does not match 'test2'
+CREATE PACKAGE test2 AS
+FUNCTION f1 RETURN INT;
+PROCEDURE p1;
+END test2
+$$
+DROP PACKAGE test2;
+#
+# MDEV-12089 sql_mode=ORACLE: Understand optional routine name after the END keyword
+#
+CREATE PACKAGE test2 AS
+FUNCTION f1 RETURN INT;
+PROCEDURE p1;
+END test2;
+$$
+CREATE PACKAGE BODY test2 AS
+FUNCTION f1 RETURN INT AS
+BEGIN
+RETURN 10;
+END f1.f1;
+END test2;
+$$
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near '.f1;
+END test2' at line 2
+CREATE PACKAGE BODY test2 AS
+FUNCTION f1 RETURN INT AS
+BEGIN
+RETURN 10;
+END f2;
+END test2;
+$$
+ERROR HY000: END identifier 'f2' does not match 'f1'
+CREATE PACKAGE BODY test2 AS
+PROCEDURE p1 AS
+BEGIN
+NULL;
+END p1.p1;
+END test2;
+$$
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near '.p1;
+END test2' at line 2
+CREATE PACKAGE BODY test2 AS
+PROCEDURE p1 AS
+BEGIN
+NULL;
+END p2;
+END test2;
+$$
+ERROR HY000: END identifier 'p2' does not match 'p1'
+CREATE PACKAGE BODY test2 AS
+FUNCTION f1 RETURN INT AS
+BEGIN
+RETURN 10;
+END f1;
+PROCEDURE p1 AS
+BEGIN
+NULL;
+END p1;
+END test2;
+$$
+DROP PACKAGE test2;

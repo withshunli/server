@@ -1006,6 +1006,7 @@ bool my_yyoverflow(short **a, YYSTYPE **b, ulong *yystacksize);
         ident_directly_assignable
         sp_decl_ident
         sp_block_label
+        opt_package_name
 
 %type <lex_str_ptr>
         opt_table_alias
@@ -1296,6 +1297,8 @@ bool my_yyoverflow(short **a, YYSTYPE **b, ulong *yystacksize);
         opt_serial_attribute opt_serial_attribute_list serial_attribute
         explainable_command
         set_assign
+        sf_tail_standalone sf_tail_package
+        sp_tail_standalone sp_tail_package
 END_OF_INPUT
 
 %type <NONE> call sp_proc_stmts sp_proc_stmts1 sp_proc_stmt
@@ -1322,7 +1325,7 @@ END_OF_INPUT
 %type <sp_cursor_name_and_offset> sp_cursor_name_and_offset
 %type <num> opt_exception_clause exception_handlers
 %type <lex> sp_cursor_stmt remember_lex package_routine_lex
-%type <spname> sp_name
+%type <spname> sp_name opt_sp_name
 %type <spvar> sp_param_name sp_param_name_and_type
 %type <for_loop> sp_for_loop_index_and_bounds
 %type <num> opt_sp_for_loop_direction
@@ -1967,8 +1970,12 @@ create:
             if (!(lex->package_body= new (thd->mem_root) Package_body(lex)))
               MYSQL_YYABORT;
           }
-          package_declaration_element_list END opt_ident
-          { }
+          package_declaration_element_list END opt_package_name
+          {
+            if ($9.str && strcmp($9.str, $4.str))
+              my_yyabort_error((ER_END_IDENTIFIER_DOES_NOT_MATCH, MYF(0),
+                                $9.str, $4.str));
+          }
         | CREATE PACKAGE_SYM BODY_SYM ident sp_tail_is
           {
             LEX *lex= Lex;
@@ -1978,8 +1985,12 @@ create:
             if (!(lex->package_body= new (thd->mem_root) Package_body(lex)))
               MYSQL_YYABORT;
           }
-          package_implementation_element_list END opt_ident
-          { }
+          package_implementation_element_list END opt_package_name
+          {
+            if ($9.str && strcmp($9.str, $4.str))
+              my_yyabort_error((ER_END_IDENTIFIER_DOES_NOT_MATCH, MYF(0),
+                                $9.str, $4.str));
+          }
         ;
 
 package_implementation_element_list:
@@ -2010,8 +2021,8 @@ package_implementation_element:
         ;
 
 package_implementation_element_routine:
-          sf_tail ';'
-        | sp_tail ';'
+          sf_tail_package ';'
+        | sp_tail_package ';'
         ;
 
 
@@ -2327,6 +2338,11 @@ sp_name:
               MYSQL_YYABORT;
             $$->init_qname(thd);
           }
+        ;
+
+opt_sp_name:
+          /* Empty */ { $$= NULL; }
+        | sp_name     { $$= $1; }
         ;
 
 sp_a_chistics:
@@ -6884,6 +6900,11 @@ key_part:
             if ($$ == NULL)
               MYSQL_YYABORT;
           }
+        ;
+
+opt_package_name:
+          /* empty */ { $$= null_lex_str; }
+        | ident       { $$= $1; }
         ;
 
 opt_ident:
@@ -16347,16 +16368,16 @@ view_or_trigger_or_sp_or_event:
 definer_tail:
           view_tail
         | trigger_tail
-        | sp_tail
-        | sf_tail
+        | sp_tail_standalone
+        | sf_tail_standalone
         | event_tail
         ;
 
 no_definer_tail:
           view_tail
         | trigger_tail
-        | sp_tail
-        | sf_tail
+        | sp_tail_standalone
+        | sf_tail_standalone
         | udf_tail
         | event_tail
         ;
@@ -16708,6 +16729,44 @@ sp_tail:
             sp->set_stmt_end(thd);
             lex->sql_command= SQLCOM_CREATE_PROCEDURE;
             sp->restore_thd_mem_root(thd);
+          }
+        ;
+
+sf_tail_standalone:
+          sf_tail opt_sp_name
+          {
+            if ($2 && strcmp($2->m_qname.str, Lex->sphead->m_qname.str))
+              my_yyabort_error((ER_END_IDENTIFIER_DOES_NOT_MATCH, MYF(0),
+                                $2->m_qname.str, Lex->sphead->m_qname.str));
+          }
+        ;
+
+sp_tail_standalone:
+          sp_tail opt_sp_name
+          {
+            if ($2 && strcmp($2->m_qname.str, Lex->sphead->m_qname.str))
+              my_yyabort_error((ER_END_IDENTIFIER_DOES_NOT_MATCH, MYF(0),
+                                $2->m_qname.str, Lex->sphead->m_qname.str));
+          }
+        ;
+
+sf_tail_package:
+          sf_tail
+        | sf_tail ident
+          {
+            if (strcmp($2.str, Lex->sphead->m_name.str))
+              my_yyabort_error((ER_END_IDENTIFIER_DOES_NOT_MATCH, MYF(0),
+                                $2.str, Lex->sphead->m_name.str));
+          }
+        ;
+
+sp_tail_package:
+          sp_tail
+        | sp_tail ident
+          {
+            if (strcmp($2.str, Lex->sphead->m_name.str))
+              my_yyabort_error((ER_END_IDENTIFIER_DOES_NOT_MATCH, MYF(0),
+                                $2.str, Lex->sphead->m_name.str));
           }
         ;
 
