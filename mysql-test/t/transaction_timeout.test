@@ -1,0 +1,77 @@
+# Test Case For Kill All Transactions
+--source include/no_protocol.inc
+--source include/have_innodb.inc
+
+SET autocommit=0;
+CREATE TABLE t1 (a INT) ENGINE=InnoDB;
+
+SHOW VARIABLES LIKE 'trx%idle_timeout';
+SET trx_idle_timeout=1;
+SHOW VARIABLES LIKE 'trx%idle_timeout';
+
+BEGIN;
+INSERT INTO t1 VALUES (1),(2),(3);
+COMMIT;
+SELECT * FROM t1;
+
+BEGIN;
+INSERT INTO t1 VALUES (4),(5),(6);
+sleep 1.1;
+
+--enable_reconnect
+--error 2006 --error CR_SERVER_GONE_ERROR
+SELECT * FROM t1;
+SELECT * FROM t1;
+DROP TABLE t1;
+SET trx_idle_timeout=0;
+SHOW VARIABLES LIKE 'trx%idle_timeout';
+
+# Test Case For Kill Read-Only Transaction
+SET autocommit=0;
+CREATE TABLE t1 (a INT) ENGINE=InnoDB;
+
+SHOW VARIABLES LIKE 'trx%idle_timeout';
+SET trx_readonly_idle_timeout=1;
+SHOW VARIABLES LIKE 'trx%idle_timeout';
+
+BEGIN;
+INSERT INTO t1 VALUES (1),(2),(3);
+SELECT * FROM t1;
+COMMIT;
+SELECT * FROM t1;
+
+sleep 1.1;
+
+--enable_reconnect
+--error 2006 --error CR_SERVER_GONE_ERROR
+SELECT * FROM t1;
+SELECT * FROM t1;
+DROP TABLE t1;
+SET trx_readonly_idle_timeout=0;
+SHOW VARIABLES LIKE 'trx%idle_timeout';
+
+# Test Case For Kill Changes Transaction
+SET autocommit=0;
+CREATE TABLE t1 (a INT) ENGINE=InnoDB;
+
+SHOW VARIABLES LIKE 'trx%idle_timeout';
+SET trx_changes_idle_timeout=1;
+SHOW VARIABLES LIKE 'trx%idle_timeout';
+
+BEGIN;
+INSERT INTO t1 VALUES (1),(2),(3);
+SELECT * FROM t1;
+COMMIT;
+SELECT * FROM t1;
+
+sleep 1.1;
+
+SELECT * FROM t1;
+INSERT INTO t1 VALUES (4),(5),(6);
+sleep 1.1;
+--enable_reconnect
+--error 2006 --error CR_SERVER_GONE_ERROR
+SELECT * FROM t1;
+DROP TABLE t1;
+SET trx_changes_idle_timeout=0;
+SHOW VARIABLES LIKE 'trx%idle_timeout';

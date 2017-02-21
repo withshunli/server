@@ -1209,7 +1209,23 @@ bool do_command(THD *thd)
     number of seconds has passed.
   */
   if(!thd->skip_wait_timeout)
-    my_net_set_read_timeout(net, thd->variables.net_wait_timeout);
+  {
+    if (thd->in_active_multi_stmt_transaction())
+    {
+      bool is_trx_rw= thd->transaction.all.is_trx_read_write();
+
+      if (thd->variables.trx_idle_timeout > 0)
+        my_net_set_read_timeout(net, thd->variables.trx_idle_timeout);
+      else if (thd->variables.trx_readonly_idle_timeout > 0 && !is_trx_rw)
+        my_net_set_read_timeout(net, thd->variables.trx_readonly_idle_timeout);
+      else if (thd->variables.trx_changes_idle_timeout > 0 && is_trx_rw)
+        my_net_set_read_timeout(net, thd->variables.trx_changes_idle_timeout);
+      else
+        my_net_set_read_timeout(net, thd->variables.net_wait_timeout);
+    }
+    else
+      my_net_set_read_timeout(net, thd->variables.net_wait_timeout);
+  }
 
   /*
     XXX: this code is here only to clear possible errors of init_connect. 

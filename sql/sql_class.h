@@ -576,6 +576,9 @@ typedef struct system_variables
   ulong net_retry_count;
   ulong net_wait_timeout;
   ulong net_write_timeout;
+  ulong trx_idle_timeout;
+  ulong trx_readonly_idle_timeout;
+  ulong trx_changes_idle_timeout;
   ulong optimizer_prune_level;
   ulong optimizer_search_depth;
   ulong optimizer_selectivity_sampling_limit;
