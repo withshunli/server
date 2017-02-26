@@ -212,6 +212,8 @@ struct st_block
 static struct st_block block_stack[32];
 static struct st_block *cur_block, *block_stack_end;
 
+#define EOF_MARKER ~0U
+
 /* Open file stack */
 struct st_test_file
 {
@@ -271,6 +273,7 @@ static int replace(DYNAMIC_STRING *ds_str,
 static uint opt_protocol=0;
 
 DYNAMIC_ARRAY q_lines;
+DYNAMIC_ARRAY q_linenos;
 
 #include "sslopt-vars.h"
 
@@ -387,6 +390,7 @@ enum enum_commands {
   Q_UNKNOWN,			       /* Unknown command.   */
   Q_COMMENT,			       /* Comments, ignored. */
   Q_COMMENT_WITH_COMMAND,
+  Q_EOF,
   Q_EMPTY_LINE
 };
 
@@ -1473,6 +1477,7 @@ void free_used_memory()
   while (embedded_server_arg_count > 1)
     my_free(embedded_server_args[--embedded_server_arg_count]);
   delete_dynamic(&q_lines);
+  delete_dynamic(&q_linenos);
   dynstr_free(&ds_res);
   if (ds_warn)
     dynstr_free(ds_warn);
@@ -3194,17 +3199,10 @@ void do_source(struct st_command *command)
                      sizeof(source_args)/sizeof(struct command_arg),
                      ' ');
 
-  /*
-    If this file has already been sourced, don't source it again.
-    It's already available in the q_lines cache.
-  */
-  if (parser.current_line < (parser.read_lines - 1))
-    ; /* Do nothing */
-  else
-  {
-    DBUG_PRINT("info", ("sourcing file: %s", ds_filename.str));
-    open_file(ds_filename.str);
-  }
+  struct st_test_file* old=cur_file;
+  DBUG_PRINT("info", ("sourcing file: %s", ds_filename.str));
+  open_file(ds_filename.str);
+  DBUG_ASSERT(old != cur_file);
 
   dynstr_free(&ds_filename);
   DBUG_VOID_RETURN;
@@ -6433,29 +6431,8 @@ int read_line(char *buf, int size)
     c= my_getc(cur_file->file);
     if (feof(cur_file->file))
     {
-  found_eof:
-      if (cur_file->file != stdin)
-      {
-	fclose(cur_file->file);
-        cur_file->file= 0;
-      }
-      my_free(cur_file->file_name);
-      cur_file->file_name= 0;
-      if (cur_file == file_stack)
-      {
-        /* We're back at the first file, check if
-           all { have matching }
-        */
-        if (cur_block != block_stack)
-          die("Missing end of block");
-
-        *p= 0;
-        DBUG_PRINT("info", ("end of file at line %d", cur_file->lineno));
-        DBUG_RETURN(1);
-      }
-      cur_file--;
-      start_lineno= cur_file->lineno;
-      continue;
+      cur_file->lineno= EOF_MARKER;
+      DBUG_RETURN(0);
     }
 
     if (c == '\n')
@@ -6599,7 +6576,10 @@ int read_line(char *buf, int size)
             /* completed before we pass buf_end */
             c= my_getc(cur_file->file);
             if (feof(cur_file->file))
-              goto found_eof;
+            {
+              cur_file->lineno= EOF_MARKER;
+              DBUG_RETURN(0);
+            }
             *p++ = c;
             continue;
           }
@@ -6771,6 +6751,8 @@ int read_command(struct st_command** command_ptr)
   if (parser.current_line < parser.read_lines)
   {
     get_dynamic(&q_lines, command_ptr, parser.current_line) ;
+    get_dynamic(&q_linenos, &start_lineno, parser.current_line);
+    cur_file->lineno= start_lineno;
     DBUG_RETURN(0);
   }
   if (!(*command_ptr= command=
@@ -6786,12 +6768,18 @@ int read_command(struct st_command** command_ptr)
     check_eol_junk(read_command_buf);
     DBUG_RETURN(1);
   }
+  insert_dynamic(&q_linenos, &start_lineno);
+  DBUG_ASSERT(q_linenos.elements == q_lines.elements);
 
   if (opt_result_format_version == 1)
     convert_to_format_v1(read_command_buf);
 
   DBUG_PRINT("info", ("query: '%s'", read_command_buf));
-  if (*p == '#')
+  if (cur_file->lineno == EOF_MARKER)
+  {
+    command->type= Q_EOF;
+  }
+  else if (*p == '#')
   {
     command->type= Q_COMMENT;
   }
@@ -8916,6 +8904,7 @@ int main(int argc, char **argv)
   cur_block->cmd= cmd_none;
 
   my_init_dynamic_array(&q_lines, sizeof(struct st_command*), 1024, 1024, MYF(0));
+  my_init_dynamic_array(&q_linenos, sizeof(cur_file->lineno), 1024, 1024, MYF(0));
 
   if (my_hash_init2(&var_hash, 64, charset_info,
                  128, 0, 0, get_var_key, 0, var_free, MYF(0)))
@@ -9102,7 +9091,9 @@ int main(int argc, char **argv)
       because they change the grammar.
     */
     ok_to_do= cur_block->ok || command->type == Q_DELIMITER
-                            || command->type == Q_PERL;
+                            || command->type == Q_PERL
+                            || command->type == Q_SOURCE
+                            || command->type == Q_EOF;
     /*
       Some commands need to be "done" the first time if they may get
       re-iterated over in a true context. This can only happen if there's 
@@ -9110,8 +9101,7 @@ int main(int argc, char **argv)
     */
     if (!ok_to_do)
     {
-      if (command->type == Q_SOURCE ||
-          command->type == Q_ERROR ||
+      if (command->type == Q_ERROR ||
           command->type == Q_WRITE_FILE ||
           command->type == Q_APPEND_FILE)
       {
@@ -9453,6 +9443,24 @@ int main(int argc, char **argv)
         /* Abort test with error code and error message */
         die("%s", command->first_argument);
         break;
+      case Q_EOF:
+        if (cur_file->file != stdin)
+        {
+          fclose(cur_file->file);
+          cur_file->file= 0;
+        }
+        my_free(cur_file->file_name);
+        cur_file->file_name= 0;
+        if (cur_file != file_stack)
+        {
+          cur_file--;
+          start_lineno= cur_file->lineno;
+          break;
+        }
+        /* We're back at the first file, check if all { have matching } */
+        if (cur_block != block_stack)
+          die("Missing end of block");
+        /* fall through to Q_EXIT */
       case Q_EXIT:
         /* Stop processing any more commands */
         abort_flag= 1;
@@ -9485,7 +9493,7 @@ int main(int argc, char **argv)
     else
       check_eol_junk(command->last_argument);
 
-    if (command->type != Q_ERROR &&
+    if (command->type != Q_ERROR && command->type != Q_EOF &&
         command->type != Q_COMMENT)
     {
       /*

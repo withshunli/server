@@ -202,7 +202,7 @@ mysqltest: At line 1: Extra argument '6' passed to 'sleep'
 mysqltest: At line 1: Extra argument '6' passed to 'sleep'
 mysqltest: At line 1: Extra argument 'A comment
 show status' passed to 'sleep'
-mysqltest: At line 1: End of line junk detected: "sleep 7
+mysqltest: At line 1: End of line junk detected: "7
 # Another comment
 "
 mysqltest: At line 1: Extra argument 'comment
@@ -211,18 +211,15 @@ disable_query_log' passed to 'disconnect'
 mysqltest: At line 1: Extra argument 'comment
 # comment 3
 disable_query_log' passed to 'disconnect'
-mysqltest: At line 1: End of line junk detected: "disconnect default
-
+mysqltest: At line 1: End of line junk detected: "default
 #
 # comment
 # comment2
-
 # comment 3
 --disable_query_log
 "
-mysqltest: At line 1: End of line junk detected: "disconnect default # comment
+mysqltest: At line 1: End of line junk detected: "default # comment
 # comment part2
-
 # comment 3
 --disable_query_log
 "
@@ -981,5 +978,11 @@ disconnect con1;
 con2
 disconnect con2;
 -closed_connection-
+mysqltest: In included file "MYSQL_TMP_DIR/b.inc": 
+included from <stdin> at line 3:
+At line 2: Extra argument '2' passed to 'sleep'
+mysqltest: In included file "MYSQL_TMP_DIR/b.inc": 
+included from <stdin> at line 3:
+At line 2: Extra argument '2' passed to 'sleep'
 End of tests
 connection default;

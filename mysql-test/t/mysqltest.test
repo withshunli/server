@@ -2948,6 +2948,38 @@ disconnect $x;
 disconnect $y;
 --echo $CURRENT_CONNECTION
 
+#
+# error in the sourced file, inside a loop
+#
+
+write_file $MYSQL_TMP_DIR/a.test;
+let $a=1;
+while($a) {
+  source $MYSQL_TMP_DIR/b.inc;
+}
+EOF
+write_file $MYSQL_TMP_DIR/b.inc;
+if ($a) {
+  sleep 1 2;
+}
+EOF
+replace_result $MYSQL_TMP_DIR MYSQL_TMP_DIR;
+error 1;
+exec $MYSQL_TEST < $MYSQL_TMP_DIR/a.test 2>&1;
+remove_file $MYSQL_TMP_DIR/a.test;
+
+write_file $MYSQL_TMP_DIR/a.test;
+let $a=0;
+while($a<10) {
+  source $MYSQL_TMP_DIR/b.inc;
+  inc $a;
+}
+EOF
+replace_result $MYSQL_TMP_DIR MYSQL_TMP_DIR;
+error 1;
+exec $MYSQL_TEST < $MYSQL_TMP_DIR/a.test 2>&1;
+remove_file $MYSQL_TMP_DIR/a.test;
+remove_file $MYSQL_TMP_DIR/b.inc;
 
 --echo End of tests
 
