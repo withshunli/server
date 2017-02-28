@@ -111,11 +111,11 @@ log_scrub_failure(
 Lock dict mutexes */
 static
 bool
-btr_scrub_lock_dict_func(ulint space, bool lock_to_close_table,
+btr_scrub_lock_dict_func(ulint space_id, bool lock_to_close_table,
 			 const char * file, uint line)
 {
-	uint start = time(0);
-	uint last = start;
+	time_t start = time(0);
+	time_t last = start;
 
 	while (mutex_enter_nowait_func(&(dict_sys->mutex), file, line)) {
 		/* if we lock to close a table, we wait forever
@@ -123,19 +123,24 @@ btr_scrub_lock_dict_func(ulint space, bool lock_to_close_table,
 		* is closing, and then instead give up
 		*/
 		if (lock_to_close_table == false) {
-			if (fil_crypt_is_closing(space)) {
+			fil_space_t* space = fil_space_acquire(space_id);
+			if (!space || space->stop_new_ops) {
+				if (space) {
+					fil_space_release(space);
+				}
 				return false;
 			}
+			fil_space_release(space);
 		}
 		os_thread_sleep(250000);
 
-		uint now = time(0);
+		time_t now = time(0);
 		if (now >= last + 30) {
 			fprintf(stderr,
-				"WARNING: %s:%u waited %u seconds for"
+				"WARNING: %s:%u waited %ld seconds for"
 				" dict_sys lock, space: %lu"
-				" lock_to_close_table: %u\n",
-				file, line, now - start, space,
+				" lock_to_close_table: %d\n",
+				file, line, now - start, space_id,
 				lock_to_close_table);
 
 			last = now;

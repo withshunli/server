@@ -185,8 +185,18 @@ extern fil_addr_t	fil_addr_null;
 
 #ifndef UNIV_INNOCHECKSUM
 
-/* structure containing encryption specification */
-typedef struct fil_space_crypt_struct fil_space_crypt_t;
+/** Structure containing encryption specification */
+struct fil_space_crypt_t;
+
+/** Enum values for encryption table option */
+enum fil_encryption_t {
+	/** Encrypted if innodb_encrypt_tables=ON (srv_encrypt_tables) */
+	FIL_ENCRYPTION_DEFAULT,
+	/** Encrypted */
+	FIL_ENCRYPTION_ON,
+	/** Not encrypted */
+	FIL_ENCRYPTION_OFF
+};
 
 /** The number of fsyncs done to the log */
 extern ulint	fil_n_log_flushes;
@@ -276,7 +286,7 @@ struct fil_space_t {
 				.ibd file of tablespace and want to
 				stop temporarily posting of new i/o
 				requests on the file */
-	ibool		stop_new_ops;
+	bool		stop_new_ops;
 				/*!< we set this TRUE when we start
 				deleting a single-table tablespace.
 				When this is set following new ops
@@ -343,7 +353,21 @@ struct fil_space_t {
 	UT_LIST_NODE_T(fil_space_t) space_list;
 				/*!< list of all spaces */
 
+	/*!< Protected by fil_system */
+	UT_LIST_NODE_T(fil_space_t) rotation_list;
+				/*!< list of spaces needing
+				key rotation */
+
+	bool		is_in_rotation_list;
+				/*!< true if this space is
+				currently in key rotation list */
+
 	ulint		magic_n;/*!< FIL_SPACE_MAGIC_N */
+
+	bool is_stopping() const
+	{
+		return stop_new_ops;
+	}
 };
 
 /** Value of fil_space_t::magic_n */
@@ -399,6 +423,11 @@ struct fil_system_t {
 					request */
 	UT_LIST_BASE_NODE_T(fil_space_t) space_list;
 					/*!< list of all file spaces */
+
+	UT_LIST_BASE_NODE_T(fil_space_t) rotation_list;
+					/*!< list of all file spaces needing
+					key rotation.*/
+
 	ibool		space_id_reuse_warned;
 					/* !< TRUE if fil_space_create()
 					has issued a warning about
@@ -470,18 +499,24 @@ fil_space_truncate_start(
 /*******************************************************************//**
 Creates a space memory object and puts it to the 'fil system' hash table.
 If there is an error, prints an error message to the .err log.
+@param[in]	name		Space name
+@param[in]	id		Space id
+@param[in]	flags		Tablespace flags
+@param[in]	purpose		FIL_TABLESPACE or FIL_LOG if log
+@param[in]	crypt_data	Encryption information
+@param[in]	create_table	True if this is create table
+@param[in]	mode		Encryption mode
 @return	TRUE if success */
 UNIV_INTERN
-ibool
+bool
 fil_space_create(
-/*=============*/
-	const char*	name,	/*!< in: space name */
-	ulint		id,	/*!< in: space id */
-	ulint		zip_size,/*!< in: compressed page size, or
-				0 for uncompressed tablespaces */
-	ulint		purpose, /*!< in: FIL_TABLESPACE, or FIL_LOG if log */
-	fil_space_crypt_t* crypt_data, /*!< in: crypt data */
-	bool		create_table); /*!< in: true if create table */
+	const char*		name,
+	ulint			id,
+	ulint			flags,
+	ulint			purpose,
+	fil_space_crypt_t*	crypt_data,
+	bool			create_table,
+	fil_encryption_t	mode = FIL_ENCRYPTION_DEFAULT);
 
 /*******************************************************************//**
 Assigns a new space id for a new single-table tablespace. This works simply by
@@ -604,6 +639,59 @@ fil_write_flushed_lsn_to_data_files(
 /*================================*/
 	lsn_t	lsn,		/*!< in: lsn to write */
 	ulint	arch_log_no);	/*!< in: latest archived log file number */
+
+/** Acquire a tablespace when it could be dropped concurrently.
+Used by background threads that do not necessarily hold proper locks
+for concurrency control.
+@param[in]	id	tablespace ID
+@return the tablespace, or NULL if missing or being deleted */
+fil_space_t*
+fil_space_acquire(
+	ulint	id)
+	MY_ATTRIBUTE((warn_unused_result));
+
+/** Acquire a tablespace that may not exist.
+Used by background threads that do not necessarily hold proper locks
+for concurrency control.
+@param[in]	id	tablespace ID
+@return the tablespace, or NULL if missing or being deleted */
+fil_space_t*
+fil_space_acquire_silent(
+	ulint	id)
+	MY_ATTRIBUTE((warn_unused_result));
+
+/** Release a tablespace acquired with fil_space_acquire().
+@param[in,out]	space	tablespace to release  */
+void
+fil_space_release(
+	fil_space_t*	space);
+
+/** Return the next fil_space_t.
+Once started, the caller must keep calling this until it returns NULL.
+fil_space_acquire() and fil_space_release() are invoked here which
+blocks a concurrent operation from dropping the tablespace.
+@param[in,out]	prev_space	Pointer to the previous fil_space_t.
+If NULL, use the first fil_space_t on fil_system->space_list.
+@return pointer to the next fil_space_t.
+@retval NULL if this was the last  */
+fil_space_t*
+fil_space_next(
+	fil_space_t*	prev_space)
+	MY_ATTRIBUTE((warn_unused_result));
+
+/** Return the next fil_space_t from key rotation list.
+Once started, the caller must keep calling this until it returns NULL.
+fil_space_acquire() and fil_space_release() are invoked here which
+blocks a concurrent operation from dropping the tablespace.
+@param[in,out]	prev_space	Pointer to the previous fil_space_t.
+If NULL, use the first fil_space_t on fil_system->space_list.
+@return pointer to the next fil_space_t.
+@retval NULL if this was the last*/
+fil_space_t*
+fil_space_keyrotate_next(
+	fil_space_t*	prev_space)
+	MY_ATTRIBUTE((warn_unused_result));
+
 /*******************************************************************//**
 Reads the flushed lsn, arch no, and tablespace flag fields from a data
 file at database startup.
@@ -1101,6 +1189,36 @@ ulint
 fil_page_get_type(
 /*==============*/
 	const byte*	page);	/*!< in: file page */
+
+/********************************************************************//**
+Reads data from a space to a buffer. Remember that the possible incomplete
+blocks at the end of file are ignored: they are not taken into account when
+calculating the byte offset within a space.
+@return DB_SUCCESS, or DB_TABLESPACE_DELETED if we are trying to do
+i/o on a tablespace which does not exist */
+UNIV_INTERN
+dberr_t
+fil_read(
+/*=====*/
+	bool	sync,		/*!< in: true if synchronous aio is desired */
+	ulint	space_id,	/*!< in: space id */
+	ulint	zip_size,	/*!< in: compressed page size in bytes;
+				0 for uncompressed pages */
+	ulint	block_offset,	/*!< in: offset in number of blocks */
+	ulint	byte_offset,	/*!< in: remainder of offset in bytes; in aio
+				this must be divisible by the OS block size */
+	ulint	len,		/*!< in: how many bytes to read; this must not
+				cross a file boundary; in aio this must be a
+				block size multiple */
+	void*	buf,		/*!< in/out: buffer where to store data read;
+				in aio this must be appropriately aligned */
+	void*	message,	/*!< in: message for aio handler if non-sync
+				aio used, else ignored */
+	ulint*	write_size);	/*!< in/out: Actual write size initialized
+				after fist successfull trim
+				operation for this page and if
+				initialized we do not trim again if
+				actual page size does not decrease. */
 
 /*******************************************************************//**
 Returns TRUE if a single-table tablespace is being deleted.

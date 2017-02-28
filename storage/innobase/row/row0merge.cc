@@ -3992,8 +3992,10 @@ row_merge_build_indexes(
 		DBUG_RETURN(DB_OUT_OF_MEMORY);
 	}
 
-	/* Get crypt data from tablespace if present. */
-	crypt_data = fil_space_get_crypt_data(new_table->space);
+	/* Get crypt data from tablespace if present. We should be protected
+	from concurrent DDL (e.g. drop table) by MDL-locks. */
+	fil_space_t* space = fil_space_acquire(new_table->space);
+	crypt_data = space->crypt_data;
 	crypt_block = NULL;
 
 	/* If tablespace is encrypted, allocate additional buffer for
@@ -4357,6 +4359,8 @@ func_exit:
 			}
 		}
 	}
+
+	fil_space_release(space);
 
 	DBUG_RETURN(error);
 }
