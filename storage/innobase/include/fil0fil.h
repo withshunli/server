@@ -176,8 +176,6 @@ struct fil_space_t {
 	/** True if page 0 of tablespace is read */
 	bool		read_page0;
 
-        /** True if we have tested if this filespace supports atomic writes */
-        bool            atomic_write_tested;
         /** True if the device this filespace is on supports atomic writes */
         bool            atomic_write_supported;
 
