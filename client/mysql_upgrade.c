@@ -37,7 +37,7 @@
 #endif
 
 static int phase = 0;
-static int phases_total = 6;
+static const int phases_total = 7;
 static char mysql_path[FN_REFLEN];
 static char mysqlcheck_path[FN_REFLEN];
 
@@ -929,19 +929,19 @@ static void print_line(char* line)
   Check for entries with "Unknown storage engine" in I_S.TABLES,
   try to load plugins for these tables if available (MDEV-11942)
 */
-static int run_mysqlcheck_engines(void)
+static int install_used_engines(void)
 {
-  DYNAMIC_STRING ds_query;
+  char buf[512];
   DYNAMIC_STRING ds_result;
+  const char *query = "SELECT DISTINCT LOWER(engine) FROM information_schema.tables"
+                      " WHERE table_comment LIKE 'Unknown storage engine%'";
 
-  /* Trying to identify existing tables with unknown storage engine
-     Does not work with all engine types yet, and doesn't produce
-     results for BLACKHOLE without the dummy "WHERE row_format IS NULL"
-     condition yet. See MDEV-11943 */
-  const char *query = "SELECT DISTINCT LOWER(REPLACE(REPLACE(table_comment, 'Unknown storage engine ', ''), '\\'', '')) AS engine FROM information_schema.tables WHERE row_format IS NULL AND table_comment LIKE 'Unknown storage engine%'";
-
-  if (init_dynamic_string(&ds_query, "", 512, 512))
-    die("Out of memory");
+  if (opt_systables_only)
+  {
+    verbose("Phase %d/%d: Installing used storage engines... Skipped", ++phase, phases_total);
+    return 0;
+  }
+  verbose("Phase %d/%d: Installing used storage engines", ++phase, phases_total);
 
   if (init_dynamic_string(&ds_result, "", 512, 512))
     die("Out of memory");
@@ -950,24 +950,28 @@ static int run_mysqlcheck_engines(void)
 
   run_query(query, &ds_result, TRUE);
 
+  if (ds_result.length)
   {
-    char *line= ds_result.str;
-    if (line && *line) {
-      do
-      {
-        line[strlen(line)-1]='\0';
-        verbose("installing missing plugin for '%s' storage engine", line);
+    char *line= ds_result.str, *next=get_line(line);
+    do
+    {
+      if (next[-1] == '\n')
+        next[-1]=0;
 
-        dynstr_set(&ds_query, "INSTALL SONAME 'ha_");
-        dynstr_append(&ds_query, line); // we simply assume SONAME=ha_ENGINENAME
-        dynstr_append(&ds_query, "'");
+      verbose("installing plugin for '%s' storage engine", line);
 
-        if (run_query(ds_query.str, NULL, TRUE)) {
-          fprintf(stderr, "... can't install plugin 'ha_%s'\n", line);
-        }
-      } while ((line= get_line(line)) && *line);
-    }
+      // we simply assume soname=ha_enginename
+      strxnmov(buf, sizeof(buf)-1, "install soname 'ha_", line, "'", NULL);
+
+
+      if (run_query(buf, NULL, TRUE))
+        fprintf(stderr, "... can't %s\n", buf);
+      line=next;
+      next=get_line(line);
+    } while (*line);
   }
+  dynstr_free(&ds_result);
+  return 0;
 }
 
 
@@ -1176,8 +1180,8 @@ int main(int argc, char **argv)
   /*
     Run "mysqlcheck" and "mysql_fix_privilege_tables.sql"
   */
-  if (run_mysqlcheck_engines() ||
-      run_mysqlcheck_upgrade(TRUE) ||
+  if (run_mysqlcheck_upgrade(TRUE) ||
+      install_used_engines() ||
       run_mysqlcheck_views() ||
       run_sql_fix_privilege_tables() ||
       run_mysqlcheck_fixnames() ||
